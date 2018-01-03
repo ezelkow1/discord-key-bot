@@ -3,27 +3,40 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/bwmarrin/discordgo"
+	//"github.com/rapidloop/skv"
+	//"encoding/gob"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"regexp"
+	//"runtime"
+	"strconv"
 	"strings"
 	"syscall"
-
-	"github.com/bwmarrin/discordgo"
-	"github.com/rapidloop/skv"
 )
+
+const file = "keys.db"
 
 // Variables used for command line parameters
 var (
 	Token string
-	//re = regexp.MustCompile("(\b[a-z A-Z]* )(.*)")
-	re = regexp.MustCompile("([a-z A-Z]* )")
+	re    = regexp.MustCompile("([a-z A-Z]* )")
+	//store, err = skv.Open("keys.db")
+	x      = make(map[string][]gamekey)
+	myfile *os.File
 )
 
 func init() {
 
 	flag.StringVar(&Token, "t", "", "Bot Token")
 	flag.Parse()
+}
+
+type gamekey struct {
+	author   string
+	gamename string
+	serial   string
 }
 
 func main() {
@@ -34,13 +47,29 @@ func main() {
 		fmt.Println("error creating Discord session,", err)
 		return
 	}
-
-	store, err := skv.Open("keys.db")
-	store.Put("teststuff", "123")
-	store.Put("teststuff", "456")
-	var info string
-	store.Get("teststuff", &info)
-	fmt.Println("testinfo: ", info)
+	myfile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0666)
+	_ = err
+	_ = myfile
+	x, err := ioutil.ReadFile(file)
+	_ = x
+	_ = err
+	/*
+		fileInfo, err := os.Stat(file)
+		_ = fileInfo
+		if err != nil {
+			if os.IsNotExist(err) {
+				//Create file
+				myfile, err := os.Create(file)
+				_ = err
+				_ = myfile
+			} else if os.IsExist(err) {
+				myfile := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0666)
+				//Read file
+				x, err := ioutil.ReadFile(file)
+				_ = err
+				fmt.Println("Current file", x)
+			}
+		} */
 	// Register the messageCreate func as a callback for MessageCreate events.
 	dg.AddHandler(messageCreate)
 
@@ -64,7 +93,6 @@ func main() {
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the autenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	s.ChannelMessage(m.ChannelID, "weeeeee")
 	// Ignore all messages created by the bot itself
 	// This isn't required in this specific example but it's a good practice.
 	if m.Author.ID == s.State.User.ID {
@@ -75,10 +103,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if strings.HasPrefix(m.Content, "!add ") == true {
 		m.Content = strings.TrimPrefix(m.Content, "!add ")
 		regtest := re.Split(m.Content, -1)
-		//output := strings.Split(m.Content, ",")
-		//fmt.Println("output ", output[1])
-		fmt.Println("regout ", regtest)
-		fmt.Println(regtest[1])
 		key := regtest[1]
 		gamename := strings.TrimSuffix(m.Content, key)
 		gamename = strings.TrimSpace(gamename)
@@ -87,9 +111,24 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		stringout := []string{"Key: ", key, ", game: ", gamename, ", normalized: ", normalized}
 		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
 
-		//fmt.Println(regtest[1])
-		//mout := []string{"Adding ", output[1], " from user ", m.Author.Username}
-		//s.ChannelMessageSend(m.ChannelID, strings.Join(mout, " "))
+		var thiskey gamekey
+		thiskey.author = m.Author.Username
+		thiskey.gamename = gamename
+		thiskey.serial = key
+
+		fmt.Println("loaded file")
+		for i := range x[normalized] {
+			if thiskey.serial == x[normalized][i].serial {
+				fmt.Println("Key already entered")
+				return
+			}
+		}
+		x[normalized] = append(x[normalized], thiskey)
+		stringout = []string{"Thanks ", thiskey.author, " for adding a key for ", thiskey.gamename,
+			". There are now ", strconv.Itoa(len(x[normalized])), " keys for ", thiskey.gamename}
+		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+		fmt.Println("keys:", x)
+
 	}
 
 	// If the message is "pong" reply with "Ping!"
