@@ -19,8 +19,9 @@ const file = "keys.db"
 
 // Variables used for command line parameters
 var (
-	Token string
-	re    = regexp.MustCompile("([a-z A-Z]* )")
+	Token            string
+	re               = regexp.MustCompile("([a-z A-Z]* )")
+	broadcastChannel = "397967839572787202"
 	//store, err = skv.Open("keys.db")
 	x = make(map[string][]GameKey)
 )
@@ -83,30 +84,31 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		key := regtest[1]
 		gamename := CleanGame(m.Content, key)
 		normalized := NormalizeGame(gamename)
-		stringout := []string{"Key: ", key, ", game: ", gamename, ", normalized: ", normalized}
-		s.ChannelMessageSend("397967839572787202", strings.Join(stringout, ""))
 
 		var thiskey GameKey
 		thiskey.Author = m.Author.Username
 		thiskey.GameName = gamename
 		thiskey.Serial = key
 		Load(file, &x)
-		fmt.Println("loaded file, ", x)
+
+		//Check if key already exists
 		for i := range x[normalized] {
 			if thiskey.Serial == x[normalized][i].Serial {
 				s.ChannelMessageSend(m.ChannelID, "Key already entered")
 				return
 			}
 		}
+
+		//Add new key and notify user and channel, then save to disk
 		x[normalized] = append(x[normalized], thiskey)
-		stringout = []string{"Thanks ", thiskey.Author, " for adding a key for ", thiskey.GameName,
+		stringout := []string{"Thanks ", thiskey.Author, " for adding a key for ", thiskey.GameName,
 			". There are now ", strconv.Itoa(len(x[normalized])), " keys for ", thiskey.GameName}
+		s.ChannelMessageSend(broadcastChannel, strings.Join(stringout, ""))
 		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
-		fmt.Println("keys:", x)
 		Save(file, x)
 	}
 
-	// If the message is "pong" reply with "Ping!"
+	// List off current games and amount of keys for each
 	if m.Content == "!listkeys" {
 		Load(file, &x)
 		for i := range x {
@@ -115,8 +117,21 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
+	// Grab a key for a game
 	if strings.HasPrefix(m.Content, "!take ") == true {
+		// Clean up content
+		m.Content = strings.TrimPrefix(m.Content, "!take ")
+		gamename := CleanGame(m.Content, " ")
+		normalized := NormalizeGame(gamename)
 		//We need to pop off a game, if it exists
+		mykeys, ok := x[normalized]
+		if ok {
+			stringout := []string{gamename, " has ", strconv.Itoa(len(mykeys)), " keys"}
+			s.ChannelMessageSend(broadcastChannel, strings.Join(stringout, ""))
+		} else {
+			stringout := []string{gamename, " doesn't exist you cheeky bastard!"}
+			s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+		}
 
 		//Now we need to broadcast that key was taken, by who
 	}
