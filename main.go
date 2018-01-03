@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -15,6 +16,8 @@ import (
 // Variables used for command line parameters
 var (
 	Token string
+	//re = regexp.MustCompile("(\b[a-z A-Z]* )(.*)")
+	re = regexp.MustCompile("([a-z A-Z]* )")
 )
 
 func init() {
@@ -67,12 +70,26 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
+
 	// If the message is "ping" reply with "Pong!"
 	if strings.HasPrefix(m.Content, "!add ") == true {
-		output := strings.Split(m.Content, ",")
-		fmt.Println("output ", output[1])
-		mout := []string{"Adding ", output[1], " from user ", m.Author.Username}
-		s.ChannelMessageSend(m.ChannelID, strings.Join(mout, " "))
+		m.Content = strings.TrimPrefix(m.Content, "!add ")
+		regtest := re.Split(m.Content, -1)
+		//output := strings.Split(m.Content, ",")
+		//fmt.Println("output ", output[1])
+		fmt.Println("regout ", regtest)
+		fmt.Println(regtest[1])
+		key := regtest[1]
+		gamename := strings.TrimSuffix(m.Content, key)
+		gamename = strings.TrimSpace(gamename)
+		normalized := strings.ToLower(gamename)
+		normalized = strings.Replace(normalized, " ", "", -1)
+		stringout := []string{"Key: ", key, ", game: ", gamename, ", normalized: ", normalized}
+		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+
+		//fmt.Println(regtest[1])
+		//mout := []string{"Adding ", output[1], " from user ", m.Author.Username}
+		//s.ChannelMessageSend(m.ChannelID, strings.Join(mout, " "))
 	}
 
 	// If the message is "pong" reply with "Ping!"
