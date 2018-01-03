@@ -1,19 +1,18 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/bwmarrin/discordgo"
-	//"github.com/rapidloop/skv"
-	//"encoding/gob"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"regexp"
-	//"runtime"
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/bwmarrin/discordgo"
+	//"github.com/rapidloop/skv"
 )
 
 const file = "keys.db"
@@ -23,8 +22,7 @@ var (
 	Token string
 	re    = regexp.MustCompile("([a-z A-Z]* )")
 	//store, err = skv.Open("keys.db")
-	x      = make(map[string][]gamekey)
-	myfile *os.File
+	x = make(map[string][]GameKey)
 )
 
 func init() {
@@ -33,10 +31,11 @@ func init() {
 	flag.Parse()
 }
 
-type gamekey struct {
-	author   string
-	gamename string
-	serial   string
+//GameKey struct
+type GameKey struct {
+	Author   string
+	GameName string
+	Serial   string
 }
 
 func main() {
@@ -47,32 +46,10 @@ func main() {
 		fmt.Println("error creating Discord session,", err)
 		return
 	}
-	myfile, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0666)
-	_ = err
-	_ = myfile
-	x, err := ioutil.ReadFile(file)
-	_ = x
-	_ = err
-	/*
-		fileInfo, err := os.Stat(file)
-		_ = fileInfo
-		if err != nil {
-			if os.IsNotExist(err) {
-				//Create file
-				myfile, err := os.Create(file)
-				_ = err
-				_ = myfile
-			} else if os.IsExist(err) {
-				myfile := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0666)
-				//Read file
-				x, err := ioutil.ReadFile(file)
-				_ = err
-				fmt.Println("Current file", x)
-			}
-		} */
-	// Register the messageCreate func as a callback for MessageCreate events.
+
 	dg.AddHandler(messageCreate)
 
+	Load(file, x)
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
@@ -104,35 +81,87 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		m.Content = strings.TrimPrefix(m.Content, "!add ")
 		regtest := re.Split(m.Content, -1)
 		key := regtest[1]
-		gamename := strings.TrimSuffix(m.Content, key)
-		gamename = strings.TrimSpace(gamename)
-		normalized := strings.ToLower(gamename)
-		normalized = strings.Replace(normalized, " ", "", -1)
+		gamename := CleanGame(m.Content, key)
+		normalized := NormalizeGame(gamename)
 		stringout := []string{"Key: ", key, ", game: ", gamename, ", normalized: ", normalized}
-		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+		s.ChannelMessageSend("397967839572787202", strings.Join(stringout, ""))
 
-		var thiskey gamekey
-		thiskey.author = m.Author.Username
-		thiskey.gamename = gamename
-		thiskey.serial = key
-
-		fmt.Println("loaded file")
+		var thiskey GameKey
+		thiskey.Author = m.Author.Username
+		thiskey.GameName = gamename
+		thiskey.Serial = key
+		Load(file, &x)
+		fmt.Println("loaded file, ", x)
 		for i := range x[normalized] {
-			if thiskey.serial == x[normalized][i].serial {
-				fmt.Println("Key already entered")
+			if thiskey.Serial == x[normalized][i].Serial {
+				s.ChannelMessageSend(m.ChannelID, "Key already entered")
 				return
 			}
 		}
 		x[normalized] = append(x[normalized], thiskey)
-		stringout = []string{"Thanks ", thiskey.author, " for adding a key for ", thiskey.gamename,
-			". There are now ", strconv.Itoa(len(x[normalized])), " keys for ", thiskey.gamename}
+		stringout = []string{"Thanks ", thiskey.Author, " for adding a key for ", thiskey.GameName,
+			". There are now ", strconv.Itoa(len(x[normalized])), " keys for ", thiskey.GameName}
 		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
 		fmt.Println("keys:", x)
-
+		Save(file, x)
 	}
 
 	// If the message is "pong" reply with "Ping!"
-	if m.Content == "pong" {
-		s.ChannelMessageSend(m.ChannelID, "Ping!")
+	if m.Content == "!listkeys" {
+		Load(file, &x)
+		for i := range x {
+			stringout := []string{x[i][0].GameName, " : ", strconv.Itoa(len(x[i])), " keys"}
+			s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+		}
 	}
+
+	if strings.HasPrefix(m.Content, "!take ") == true {
+		//We need to pop off a game, if it exists
+
+		//Now we need to broadcast that key was taken, by who
+	}
+}
+
+//CleanGame cleans up the input name
+func CleanGame(name string, key string) string {
+	tmp := strings.TrimSuffix(name, key)
+	tmp = strings.TrimSpace(tmp)
+	return tmp
+}
+
+//NormalizeGame the name of the game
+func NormalizeGame(name string) string {
+	tmp := strings.ToLower(name)
+	tmp = strings.Replace(tmp, " ", "", -1)
+	return tmp
+}
+
+// Save via Gob to file
+func Save(path string, object interface{}) {
+	b, err := json.Marshal(object)
+	if err != nil {
+		fmt.Println("error on marshall")
+	}
+	fileh, err := os.Create(path)
+	n, err := fileh.Write(b)
+	b = b[:n]
+	fileh.Close()
+	return
+}
+
+// Load Gob file
+func Load(path string, object interface{}) {
+	fileh, err := os.Open(path)
+	fileinfo, err := fileh.Stat()
+	_ = err
+	b := make([]byte, fileinfo.Size())
+	n, err := fileh.Read(b)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	b = b[:n]
+	json.Unmarshal(b, &object)
+	fileh.Close()
+	return
 }
