@@ -232,6 +232,13 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	addcount := strings.Count(m.Content, "!add")
+
+	if addcount > 1 {
+		s.ChannelMessageSend(m.ChannelID, "Only one !add at a time please")
+		return
+	}
+
 	// Strip the cmd, split off key from regex and grab name
 	m.Content = strings.TrimPrefix(m.Content, "!add ")
 	regtest := re.Split(m.Content, -1)
