@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -140,25 +141,30 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Clean up content
 	m.Content = strings.TrimPrefix(m.Content, "!take ")
-	//gamename := CleanGame(m.Content, " ")
 	gamename := m.Content
 	normalized := NormalizeGame(gamename)
-	//We need to pop off a game, if it exists
 
+	//We need to pop off a game, if it exists
 	if len(x[normalized]) > 0 {
 		var userkey GameKey
 		userkey, x[normalized] = x[normalized][0], x[normalized][1:]
 		dmchan, _ := s.UserChannelCreate(m.Author.ID)
+
+		//Send the key to the user
 		stringout := []string{userkey.GameName, ": ", userkey.Serial, " was brought to you by ", userkey.Author}
 		s.ChannelMessageSend(dmchan.ID, strings.Join(stringout, ""))
 
+		//Announce to channel
 		stringout = []string{m.Author.Username, " has just taken a key for ", userkey.GameName, ". There are ", strconv.Itoa(len(x[normalized])), " keys remaining"}
 		s.ChannelMessageSend(config.BroadcastChannel, strings.Join(stringout, ""))
 
+		//If no more keys, remove entry in map
 		if len(x[normalized]) == 0 {
 			delete(x, normalized)
 		}
+
 		Save(config.DbFile, x)
+
 	} else {
 		stringout := []string{gamename, " doesn't exist you cheeky bastard!"}
 		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
@@ -172,12 +178,20 @@ func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 		s.ChannelMessageSend(config.BroadcastChannel, "No Keys present in Database")
 		return
 	}
-	//var stringout []string
+
+	// Lets make this pretty, sort keys by name
+	keys := make([]string, 0, len(x))
+	for key := range x {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	// Build the output message
 	var buffer bytes.Buffer
-	for i := range x {
-		buffer.WriteString(x[i][0].GameName)
+	for i := range keys {
+		buffer.WriteString(x[keys[i]][0].GameName)
 		buffer.WriteString(" : ")
-		buffer.WriteString(strconv.Itoa(len(x[i])))
+		buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
 		buffer.WriteString(" keys\n")
 	}
 
@@ -198,6 +212,7 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	// Strip the cmd, split off key from regex and grab name
 	m.Content = strings.TrimPrefix(m.Content, "!add ")
 	regtest := re.Split(m.Content, -1)
 	key := regtest[1]
@@ -227,21 +242,21 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	Save(config.DbFile, x)
 }
 
-//CleanKey cleans up the input name
+//CleanKey cleans up the input name. Strips trailing key from input
 func CleanKey(name string, key string) string {
 	tmp := strings.TrimSuffix(name, key)
 	tmp = strings.TrimSpace(tmp)
 	return tmp
 }
 
-//NormalizeGame the name of the game
+//NormalizeGame the name of the game, removes spaces, lowercases
 func NormalizeGame(name string) string {
 	tmp := strings.ToLower(name)
 	tmp = strings.Replace(tmp, " ", "", -1)
 	return tmp
 }
 
-// Save via Gob to file
+// Save via json to file
 func Save(path string, object interface{}) {
 	b, err := json.Marshal(object)
 	if err != nil {
@@ -254,7 +269,7 @@ func Save(path string, object interface{}) {
 	return
 }
 
-// Load Gob file
+// Load json file
 func Load(path string, object interface{}) {
 	fileh, err := os.Open(path)
 	fileinfo, err := fileh.Stat()
