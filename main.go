@@ -227,7 +227,7 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	//immediately delete the msg and warn
 	if m.ChannelID == config.BroadcastChannel {
 		s.ChannelMessageDelete(m.ChannelID, m.ID)
-		stringout := []string{"Don't be silly ", m.Author.Username, " putting keys in here is for kids"}
+		stringout := []string{"Don't be silly ", m.Author.Username, ". Send me your key in a private message"}
 		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
 		return
 	}
