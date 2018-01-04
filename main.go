@@ -121,6 +121,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	// Only allow messages in either DM or broadcast channel
+	dmchan, _ := s.UserChannelCreate(m.Author.ID)
+	if (m.ChannelID != config.BroadcastChannel) && (m.ChannelID != dmchan.ID) {
+		return
+	}
+
 	// Add a new key to the db
 	if strings.HasPrefix(m.Content, "!add ") == true {
 		AddGame(s, m)
