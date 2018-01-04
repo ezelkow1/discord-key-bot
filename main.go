@@ -29,10 +29,9 @@ type Configuration struct {
 	DbFile           string
 }
 
-// Variables used for command line parameters
+// Variables used for command line parameters or global
 var (
-	config = Configuration{}
-	//re       = regexp.MustCompile("([a-z A-Z\d]* )")
+	config     = Configuration{}
 	re         = regexp.MustCompile(`.*\s`)
 	x          = make(map[string][]GameKey)
 	configfile string
@@ -71,6 +70,10 @@ func main() {
 		return
 	}
 
+	// Register ready as a callback for the ready events.
+	dg.AddHandler(ready)
+
+	// Register messageCreate as a callback for message events
 	dg.AddHandler(messageCreate)
 
 	if _, err := os.Stat(config.DbFile); os.IsNotExist(err) {
@@ -98,18 +101,22 @@ func main() {
 	dg.Close()
 }
 
-var gameset = false
+// This function will be called (due to AddHandler above) when the bot receives
+// the "ready" event from Discord.
+func ready(s *discordgo.Session, event *discordgo.Ready) {
+
+	// Set the playing status.
+	s.UpdateStatus(0, "keys go in my piehole")
+
+	s.ChannelMessageSend(config.BroadcastChannel, "Keybot has arrived. You may now use me like the dumpster I am")
+}
 
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the autenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+
 	// Ignore all messages created by the bot itself
 	// This isn't required in this specific example but it's a good practice.
-
-	if !gameset {
-		s.UpdateStatus(0, "I GOT YO KEYS")
-		gameset = true
-	}
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
