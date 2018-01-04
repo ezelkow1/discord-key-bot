@@ -61,6 +61,7 @@ func main() {
 
 	}
 	Load(config.DbFile, x)
+
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
@@ -87,48 +88,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	// If the message is "ping" reply with "Pong!"
+	// Add a new key to the db
 	if strings.HasPrefix(m.Content, "!add ") == true {
-		m.Content = strings.TrimPrefix(m.Content, "!add ")
-		regtest := re.Split(m.Content, -1)
-		key := regtest[1]
-		gamename := CleanGame(m.Content, key)
-		normalized := NormalizeGame(gamename)
-
-		var thiskey GameKey
-		thiskey.Author = m.Author.Username
-		thiskey.GameName = gamename
-		thiskey.Serial = key
-		Load(config.DbFile, &x)
-
-		//Check if key already exists
-		for i := range x[normalized] {
-			if thiskey.Serial == x[normalized][i].Serial {
-				s.ChannelMessageSend(m.ChannelID, "Key already entered")
-				return
-			}
-		}
-
-		//Add new key and notify user and channel, then save to disk
-		x[normalized] = append(x[normalized], thiskey)
-		stringout := []string{"Thanks ", thiskey.Author, " for adding a key for ", thiskey.GameName,
-			". There are now ", strconv.Itoa(len(x[normalized])), " keys for ", thiskey.GameName}
-		s.ChannelMessageSend(config.BroadcastChannel, strings.Join(stringout, ""))
-		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
-		Save(config.DbFile, x)
+		AddGame(s, m)
 	}
 
 	// List off current games and amount of keys for each
 	if m.Content == "!listkeys" {
-		Load(config.DbFile, &x)
-		if len(x) == 0 {
-			s.ChannelMessageSend(config.BroadcastChannel, "No Keys present in Database")
-			return
-		}
-		for i := range x {
-			stringout := []string{x[i][0].GameName, " : ", strconv.Itoa(len(x[i])), " keys"}
-			s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
-		}
+		ListKeys(s, m)
 	}
 
 	// Grab a key for a game
@@ -149,6 +116,62 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		//Now we need to broadcast that key was taken, by who
 	}
+}
+
+//ListKeys lists what games and how many keys for each
+func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
+	Load(config.DbFile, &x)
+	if len(x) == 0 {
+		s.ChannelMessageSend(config.BroadcastChannel, "No Keys present in Database")
+		return
+	}
+	for i := range x {
+		stringout := []string{x[i][0].GameName, " : ", strconv.Itoa(len(x[i])), " keys"}
+		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+	}
+}
+
+//AddGame will add a new key to the db
+// It will also check to see if the key was put in the
+// broadcast chan, remove if necessary
+func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
+
+	//Check if the user added the key from the broadcast chan, if so
+	//immediately delete the msg and warn
+	if m.ChannelID == config.BroadcastChannel {
+		s.ChannelMessageDelete(m.ChannelID, m.ID)
+		stringout := []string{"Don't be silly ", m.Author.Username, " putting keys in here is for kids"}
+		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+		return
+	}
+
+	m.Content = strings.TrimPrefix(m.Content, "!add ")
+	regtest := re.Split(m.Content, -1)
+	key := regtest[1]
+	gamename := CleanGame(m.Content, key)
+	normalized := NormalizeGame(gamename)
+
+	var thiskey GameKey
+	thiskey.Author = m.Author.Username
+	thiskey.GameName = gamename
+	thiskey.Serial = key
+	Load(config.DbFile, &x)
+
+	//Check if key already exists
+	for i := range x[normalized] {
+		if thiskey.Serial == x[normalized][i].Serial {
+			s.ChannelMessageSend(m.ChannelID, "Key already entered")
+			return
+		}
+	}
+
+	//Add new key and notify user and channel, then save to disk
+	x[normalized] = append(x[normalized], thiskey)
+	stringout := []string{"Thanks ", thiskey.Author, " for adding a key for ", thiskey.GameName,
+		". There are now ", strconv.Itoa(len(x[normalized])), " keys for ", thiskey.GameName}
+	s.ChannelMessageSend(config.BroadcastChannel, strings.Join(stringout, ""))
+	s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+	Save(config.DbFile, x)
 }
 
 //CleanGame cleans up the input name
