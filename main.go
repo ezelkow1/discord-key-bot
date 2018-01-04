@@ -100,22 +100,38 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	// Grab a key for a game
 	if strings.HasPrefix(m.Content, "!take ") == true {
-		// Clean up content
-		m.Content = strings.TrimPrefix(m.Content, "!take ")
-		gamename := CleanGame(m.Content, " ")
-		normalized := NormalizeGame(gamename)
-		//We need to pop off a game, if it exists
-		mykeys, ok := x[normalized]
-		if ok {
-			stringout := []string{gamename, " has ", strconv.Itoa(len(mykeys)), " keys"}
-			s.ChannelMessageSend(config.BroadcastChannel, strings.Join(stringout, ""))
-		} else {
-			stringout := []string{gamename, " doesn't exist you cheeky bastard!"}
-			s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
-		}
-
-		//Now we need to broadcast that key was taken, by who
+		GrabKey(s, m)
 	}
+}
+
+//GrabKey will grab one of the keys for the current game, pop it, and save
+func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
+	// Clean up content
+	m.Content = strings.TrimPrefix(m.Content, "!take ")
+	gamename := CleanGame(m.Content, " ")
+	normalized := NormalizeGame(gamename)
+	//We need to pop off a game, if it exists
+
+	if len(x[normalized]) > 0 {
+		var userkey GameKey
+		userkey, x[normalized] = x[normalized][0], x[normalized][1:]
+		dmchan, _ := s.UserChannelCreate(m.Author.ID)
+		stringout := []string{userkey.GameName, ": ", userkey.Serial, " was brought to you by ", userkey.Author}
+		s.ChannelMessageSend(dmchan.ID, strings.Join(stringout, ""))
+
+		stringout = []string{m.Author.Username, " has just taken a key for ", userkey.GameName, ". There are ", strconv.Itoa(len(x[normalized])), " keys remaining"}
+		s.ChannelMessageSend(config.BroadcastChannel, strings.Join(stringout, ""))
+
+		if len(x[normalized]) == 0 {
+			delete(x, normalized)
+		}
+		Save(config.DbFile, x)
+	} else {
+		stringout := []string{gamename, " doesn't exist you cheeky bastard!"}
+		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+	}
+
+	//Now we need to broadcast that key was taken, by who
 }
 
 //ListKeys lists what games and how many keys for each
