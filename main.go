@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -12,25 +11,7 @@ import (
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
-	//"github.com/rapidloop/skv"
 )
-
-const file = "keys.db"
-
-// Variables used for command line parameters
-var (
-	Token            string
-	re               = regexp.MustCompile("([a-z A-Z]* )")
-	broadcastChannel = "397967839572787202"
-	//store, err = skv.Open("keys.db")
-	x = make(map[string][]GameKey)
-)
-
-func init() {
-
-	flag.StringVar(&Token, "t", "", "Bot Token")
-	flag.Parse()
-}
 
 //GameKey struct
 type GameKey struct {
@@ -39,10 +20,33 @@ type GameKey struct {
 	Serial   string
 }
 
+//Configuration for bot
+type Configuration struct {
+	Token            string
+	BroadcastChannel string
+	DbFile           string
+}
+
+// Variables used for command line parameters
+var (
+	config = Configuration{}
+	re     = regexp.MustCompile("([a-z A-Z]* )")
+	x      = make(map[string][]GameKey)
+)
+
+func init() {
+	fileh, _ := os.Open("conf.json")
+	decoder := json.NewDecoder(fileh)
+	err := decoder.Decode(&config)
+	if err != nil {
+		fmt.Println("error: ", err)
+	}
+}
+
 func main() {
 
 	// Create a new Discord session using the provided bot token.
-	dg, err := discordgo.New("Bot " + Token)
+	dg, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		fmt.Println("error creating Discord session,", err)
 		return
@@ -50,7 +54,13 @@ func main() {
 
 	dg.AddHandler(messageCreate)
 
-	Load(file, x)
+	if _, err := os.Stat(config.DbFile); os.IsNotExist(err) {
+		fmt.Println("Db File does not exist, creating")
+		newFile, _ := os.Create(config.DbFile)
+		newFile.Close()
+
+	}
+	Load(config.DbFile, x)
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
@@ -89,7 +99,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		thiskey.Author = m.Author.Username
 		thiskey.GameName = gamename
 		thiskey.Serial = key
-		Load(file, &x)
+		Load(config.DbFile, &x)
 
 		//Check if key already exists
 		for i := range x[normalized] {
@@ -103,14 +113,18 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		x[normalized] = append(x[normalized], thiskey)
 		stringout := []string{"Thanks ", thiskey.Author, " for adding a key for ", thiskey.GameName,
 			". There are now ", strconv.Itoa(len(x[normalized])), " keys for ", thiskey.GameName}
-		s.ChannelMessageSend(broadcastChannel, strings.Join(stringout, ""))
+		s.ChannelMessageSend(config.BroadcastChannel, strings.Join(stringout, ""))
 		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
-		Save(file, x)
+		Save(config.DbFile, x)
 	}
 
 	// List off current games and amount of keys for each
 	if m.Content == "!listkeys" {
-		Load(file, &x)
+		Load(config.DbFile, &x)
+		if len(x) == 0 {
+			s.ChannelMessageSend(config.BroadcastChannel, "No Keys present in Database")
+			return
+		}
 		for i := range x {
 			stringout := []string{x[i][0].GameName, " : ", strconv.Itoa(len(x[i])), " keys"}
 			s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
@@ -127,7 +141,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		mykeys, ok := x[normalized]
 		if ok {
 			stringout := []string{gamename, " has ", strconv.Itoa(len(mykeys)), " keys"}
-			s.ChannelMessageSend(broadcastChannel, strings.Join(stringout, ""))
+			s.ChannelMessageSend(config.BroadcastChannel, strings.Join(stringout, ""))
 		} else {
 			stringout := []string{gamename, " doesn't exist you cheeky bastard!"}
 			s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
