@@ -201,11 +201,18 @@ func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	// Build the output message
 	var buffer bytes.Buffer
+	k := 0
 	for i := range keys {
 		buffer.WriteString(x[keys[i]][0].GameName)
 		buffer.WriteString(" : ")
 		buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
 		buffer.WriteString(" keys\n")
+		k++
+		if k == 20 {
+			s.ChannelMessageSend(m.ChannelID, buffer.String())
+			buffer.Reset()
+			k = 0
+		}
 	}
 
 	s.ChannelMessageSend(m.ChannelID, buffer.String())
