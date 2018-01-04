@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -96,11 +97,18 @@ func main() {
 	dg.Close()
 }
 
+var gameset = false
+
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the autenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore all messages created by the bot itself
 	// This isn't required in this specific example but it's a good practice.
+
+	if !gameset {
+		s.UpdateStatus(0, "I GOT YO KEYS")
+		gameset = true
+	}
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
@@ -122,7 +130,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if strings.HasPrefix(m.Content, "!help") == true {
 		s.ChannelMessageSend(m.ChannelID, "Keybot Help: ")
-		s.ChannelMessageSend(m.ChannelID, "!add game name     key - this will add a new key to the database. This should be done in a DM with the bot ")
+		s.ChannelMessageSend(m.ChannelID, "!add game name key - this will add a new key to the database. This should be done in a DM with the bot ")
 		s.ChannelMessageSend(m.ChannelID, "!listkeys - Lists current games and the number of available keys")
 		s.ChannelMessageSend(m.ChannelID, "!take game name - Will give you one of the keys for the game in a DM")
 	}
@@ -164,10 +172,16 @@ func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 		s.ChannelMessageSend(config.BroadcastChannel, "No Keys present in Database")
 		return
 	}
+	//var stringout []string
+	var buffer bytes.Buffer
 	for i := range x {
-		stringout := []string{x[i][0].GameName, " : ", strconv.Itoa(len(x[i])), " keys"}
-		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+		buffer.WriteString(x[i][0].GameName)
+		buffer.WriteString(" : ")
+		buffer.WriteString(strconv.Itoa(len(x[i])))
+		buffer.WriteString(" keys\n")
 	}
+
+	s.ChannelMessageSend(m.ChannelID, buffer.String())
 }
 
 //AddGame will add a new key to the db
