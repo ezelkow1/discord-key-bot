@@ -118,6 +118,13 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if strings.HasPrefix(m.Content, "!take ") == true {
 		GrabKey(s, m)
 	}
+
+	if strings.HasPrefix(m.Content, "!help") == true {
+		s.ChannelMessageSend(m.ChannelID, "Keybot Help: ")
+		s.ChannelMessageSend(m.ChannelID, "!add game name     key - this will add a new key to the database. This should be done in a DM with the bot ")
+		s.ChannelMessageSend(m.ChannelID, "!listkeys - Lists current games and the number of available keys")
+		s.ChannelMessageSend(m.ChannelID, "!take game name - Will give you one of the keys for the game in a DM")
+	}
 }
 
 //GrabKey will grab one of the keys for the current game, pop it, and save
