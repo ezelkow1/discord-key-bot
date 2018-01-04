@@ -29,8 +29,9 @@ type Configuration struct {
 
 // Variables used for command line parameters
 var (
-	config     = Configuration{}
-	re         = regexp.MustCompile("([a-z A-Z]* )")
+	config = Configuration{}
+	//re       = regexp.MustCompile("([a-z A-Z\d]* )")
+	re         = regexp.MustCompile(`.*\s`)
 	x          = make(map[string][]GameKey)
 	configfile string
 )
@@ -131,7 +132,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Clean up content
 	m.Content = strings.TrimPrefix(m.Content, "!take ")
-	gamename := CleanGame(m.Content, " ")
+	//gamename := CleanGame(m.Content, " ")
+	gamename := m.Content
 	normalized := NormalizeGame(gamename)
 	//We need to pop off a game, if it exists
 
@@ -185,7 +187,7 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	m.Content = strings.TrimPrefix(m.Content, "!add ")
 	regtest := re.Split(m.Content, -1)
 	key := regtest[1]
-	gamename := CleanGame(m.Content, key)
+	gamename := CleanKey(m.Content, key)
 	normalized := NormalizeGame(gamename)
 
 	var thiskey GameKey
@@ -211,8 +213,8 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	Save(config.DbFile, x)
 }
 
-//CleanGame cleans up the input name
-func CleanGame(name string, key string) string {
+//CleanKey cleans up the input name
+func CleanKey(name string, key string) string {
 	tmp := strings.TrimSuffix(name, key)
 	tmp = strings.TrimSpace(tmp)
 	return tmp
