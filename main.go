@@ -2,15 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"github.com/bwmarrin/discordgo"
 	"os"
 	"os/signal"
 	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
-
-	"github.com/bwmarrin/discordgo"
 )
 
 //GameKey struct
@@ -29,17 +29,33 @@ type Configuration struct {
 
 // Variables used for command line parameters
 var (
-	config = Configuration{}
-	re     = regexp.MustCompile("([a-z A-Z]* )")
-	x      = make(map[string][]GameKey)
+	config     = Configuration{}
+	re         = regexp.MustCompile("([a-z A-Z]* )")
+	x          = make(map[string][]GameKey)
+	configfile string
 )
 
 func init() {
-	fileh, _ := os.Open("conf.json")
+
+	flag.StringVar(&configfile, "c", "", "Configuration file location")
+	flag.Parse()
+
+	if configfile == "" {
+		fmt.Println("No config file entered")
+		os.Exit(1)
+	}
+
+	if _, err := os.Stat(configfile); os.IsNotExist(err) {
+		fmt.Println("Configfile does not exist, you should make one")
+		os.Exit(2)
+	}
+
+	fileh, _ := os.Open(configfile)
 	decoder := json.NewDecoder(fileh)
 	err := decoder.Decode(&config)
 	if err != nil {
 		fmt.Println("error: ", err)
+		os.Exit(3)
 	}
 }
 
@@ -130,8 +146,6 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 		stringout := []string{gamename, " doesn't exist you cheeky bastard!"}
 		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
 	}
-
-	//Now we need to broadcast that key was taken, by who
 }
 
 //ListKeys lists what games and how many keys for each
