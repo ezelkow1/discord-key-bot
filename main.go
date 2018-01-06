@@ -281,23 +281,6 @@ func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 }
 
-//SendEmbed will send an embed msg
-func SendEmbed(s *discordgo.Session, channelID string, title string, fieldTitle string, field string) {
-	if title != "" {
-		embed := NewEmbed().
-			SetTitle(title).
-			AddField(fieldTitle, field).
-			SetColor(embedColor).MessageEmbed
-		s.ChannelMessageSendEmbed(channelID, embed)
-	} else {
-		embed := NewEmbed().
-			AddField(fieldTitle, field).
-			SetColor(embedColor).MessageEmbed
-		s.ChannelMessageSendEmbed(channelID, embed)
-	}
-
-}
-
 //AddGame will add a new key to the db
 // It will also check to see if the key was put in the
 // broadcast chan, remove if necessary
@@ -395,6 +378,23 @@ func Load(path string, object interface{}) {
 	json.Unmarshal(b, &object)
 	fileh.Close()
 	return
+}
+
+//SendEmbed will send an embed msg
+func SendEmbed(s *discordgo.Session, channelID string, title string, fieldTitle string, field string) {
+	if title != "" {
+		embed := NewEmbed().
+			SetTitle(title).
+			AddField(fieldTitle, field).
+			SetColor(embedColor).MessageEmbed
+		s.ChannelMessageSendEmbed(channelID, embed)
+	} else {
+		embed := NewEmbed().
+			AddField(fieldTitle, field).
+			SetColor(embedColor).MessageEmbed
+		s.ChannelMessageSendEmbed(channelID, embed)
+	}
+
 }
 
 //Embed ...
