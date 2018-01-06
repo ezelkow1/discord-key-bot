@@ -142,11 +142,59 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		GrabKey(s, m)
 	}
 
+	// Search for substring of request
+	if strings.HasPrefix(m.Content, "!search ") == true {
+		SearchGame(s, m)
+	}
+
 	if strings.HasPrefix(m.Content, "!help") == true {
 		s.ChannelMessageSend(m.ChannelID, "Keybot Help: ")
 		s.ChannelMessageSend(m.ChannelID, "!add game name key - this will add a new key to the database. This should be done in a DM with the bot ")
 		s.ChannelMessageSend(m.ChannelID, "!listkeys - Lists current games and the number of available keys")
 		s.ChannelMessageSend(m.ChannelID, "!take game name - Will give you one of the keys for the game in a DM")
+		s.ChannelMessageSend(m.ChannelID, "!search search-string - Will search the database for matching games")
+	}
+}
+
+//SearchGame will scan the map keys for a match on the substring
+func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
+
+	foundgame := false
+	m.Content = strings.TrimPrefix(m.Content, "!search ")
+
+	Load(config.DbFile, &x)
+	if len(x) == 0 {
+		s.ChannelMessageSend(config.BroadcastChannel, "No Keys present in Database")
+		return
+	}
+
+	search := NormalizeGame(m.Content)
+
+	// Lets make this pretty, sort keys by name
+	keys := make([]string, 0, len(x))
+	for key := range x {
+		keys = append(keys, key)
+	}
+
+	var buffer bytes.Buffer
+	for i := range keys {
+		if strings.Contains(keys[i], search) {
+			if !foundgame {
+				//This is the first one we found
+				buffer.WriteString("Matches: \n")
+				foundgame = true
+			}
+			buffer.WriteString(x[keys[i]][0].GameName)
+			buffer.WriteString(": ")
+			buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
+			buffer.WriteString(" keys\n")
+		}
+	}
+
+	if foundgame {
+		s.ChannelMessageSend(m.ChannelID, buffer.String())
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "No Matches Found")
 	}
 }
 
