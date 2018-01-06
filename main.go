@@ -35,6 +35,7 @@ var (
 	re         = regexp.MustCompile(`.*\s`)
 	x          = make(map[string][]GameKey)
 	configfile string
+	embedColor = 0x00ff00
 )
 
 func init() {
@@ -107,8 +108,7 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 
 	// Set the playing status.
 	s.UpdateStatus(0, "keys go in my piehole")
-
-	s.ChannelMessageSend(config.BroadcastChannel, "Keybot has arrived. You may now use me like the dumpster I am")
+	SendEmbed(s, config.BroadcastChannel, "", "I iz here", "Keybot has arrived. You may now use me like the dumpster I am")
 }
 
 // This function will be called (due to AddHandler above) every time a new
@@ -148,12 +148,18 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if strings.HasPrefix(m.Content, "!help") == true {
-		s.ChannelMessageSend(m.ChannelID, "Keybot Help: ")
-		s.ChannelMessageSend(m.ChannelID, "!add game name key - this will add a new key to the database. This should be done in a DM with the bot ")
-		s.ChannelMessageSend(m.ChannelID, "!listkeys - Lists current games and the number of available keys")
-		s.ChannelMessageSend(m.ChannelID, "!take game name - Will give you one of the keys for the game in a DM")
-		s.ChannelMessageSend(m.ChannelID, "!search search-string - Will search the database for matching games")
+		PrintHelp(s, m)
 	}
+}
+
+//PrintHelp will print out the help dialog
+func PrintHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
+	var buffer bytes.Buffer
+	buffer.WriteString("!add game name key - this will add a new key to the database. This should be done in a DM with the bot\n")
+	buffer.WriteString("!listkeys - Lists current games and the number of available keys\n")
+	buffer.WriteString("!take game name - Will give you one of the keys for the game in a DM\n")
+	buffer.WriteString("!search search-string - Will search the database for matching games")
+	SendEmbed(s, m.ChannelID, "", "Available Commands", buffer.String())
 }
 
 //SearchGame will scan the map keys for a match on the substring
@@ -164,7 +170,7 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	Load(config.DbFile, &x)
 	if len(x) == 0 {
-		s.ChannelMessageSend(config.BroadcastChannel, "No Keys present in Database")
+		SendEmbed(s, config.BroadcastChannel, "", "Empty Database", "No Keys present in Database")
 		return
 	}
 
@@ -177,11 +183,10 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	var buffer bytes.Buffer
+	var output string
 	for i := range keys {
 		if strings.Contains(keys[i], search) {
 			if !foundgame {
-				//This is the first one we found
-				buffer.WriteString("Matches: \n")
 				foundgame = true
 			}
 			buffer.WriteString(x[keys[i]][0].GameName)
@@ -192,10 +197,12 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if foundgame {
-		s.ChannelMessageSend(m.ChannelID, buffer.String())
+		output = buffer.String()
 	} else {
-		s.ChannelMessageSend(m.ChannelID, "No Matches Found")
+		output = "No Matches Found"
 	}
+
+	SendEmbed(s, m.ChannelID, "", "Search Results", output)
 }
 
 //GrabKey will grab one of the keys for the current game, pop it, and save
@@ -212,12 +219,11 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 		dmchan, _ := s.UserChannelCreate(m.Author.ID)
 
 		//Send the key to the user
-		stringout := []string{userkey.GameName, ": ", userkey.Serial, " was brought to you by ", userkey.Author}
-		s.ChannelMessageSend(dmchan.ID, strings.Join(stringout, ""))
+		SendEmbed(s, dmchan.ID, "", "Here is your key", userkey.GameName+": "+userkey.Serial+"\nThis game was brought to you by "+userkey.Author)
 
 		//Announce to channel
-		stringout = []string{m.Author.Username, " has just taken a key for ", userkey.GameName, ". There are ", strconv.Itoa(len(x[normalized])), " keys remaining"}
-		s.ChannelMessageSend(config.BroadcastChannel, strings.Join(stringout, ""))
+		SendEmbed(s, config.BroadcastChannel, "", "Another satisfied customer", m.Author.Username+" has just taken a key for "+userkey.GameName+". There are "+
+			strconv.Itoa(len(x[normalized]))+" keys remaining")
 
 		//If no more keys, remove entry in map
 		if len(x[normalized]) == 0 {
@@ -227,8 +233,7 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 		Save(config.DbFile, x)
 
 	} else {
-		stringout := []string{gamename, " doesn't exist you cheeky bastard!"}
-		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+		SendEmbed(s, m.ChannelID, "", "WHY U DO DIS?", gamename+" doesn't exist you cheeky bastard!")
 	}
 }
 
@@ -236,7 +241,7 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 	Load(config.DbFile, &x)
 	if len(x) == 0 {
-		s.ChannelMessageSend(config.BroadcastChannel, "No Keys present in Database")
+		SendEmbed(s, m.ChannelID, "", "EMPTY DATABASE", "No Keys present in Database")
 		return
 	}
 
@@ -259,22 +264,18 @@ func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 		k++
 
 		if k == 20 {
-			embed := NewEmbed().
-				SetTitle("Current Key List").
-				AddField("Games: "+strconv.Itoa((i+1)-(k-1))+" to "+strconv.Itoa((i+1)), buffer.String()).
-				SetColor(0x00ff00).MessageEmbed
-			s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			SendEmbed(s, m.ChannelID, "Current Key List",
+				"Games: "+strconv.Itoa((i+1)-(k-1))+" to "+strconv.Itoa((i+1)),
+				buffer.String())
 			buffer.Reset()
 			k = 0
 		}
 	}
 
 	if k != 0 {
-		embed := NewEmbed().
-			SetTitle("Current Key List").
-			AddField("Games: "+strconv.Itoa((i+1)-(k-1))+" to "+strconv.Itoa(i+1), buffer.String()).
-			SetColor(0x00ff00).MessageEmbed
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		SendEmbed(s, m.ChannelID, "Current Key List",
+			"Games: "+strconv.Itoa((i+1)-(k-1))+" to "+strconv.Itoa(i+1),
+			buffer.String())
 		buffer.Reset()
 	}
 
@@ -289,15 +290,14 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	//immediately delete the msg and warn
 	if m.ChannelID == config.BroadcastChannel {
 		s.ChannelMessageDelete(m.ChannelID, m.ID)
-		stringout := []string{"Don't be silly ", m.Author.Username, ". Send me your key in a private message"}
-		s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+		SendEmbed(s, m.ChannelID, "", "WHY U NO READ INSTRUCTION", "Don't be silly "+m.Author.Username+". Send me your key in a private message")
 		return
 	}
 
 	addcount := strings.Count(m.Content, "!add")
 
 	if addcount > 1 {
-		s.ChannelMessageSend(m.ChannelID, "Only one !add at a time please")
+		SendEmbed(s, m.ChannelID, "", "Too many keys!", "Only one !add at a time please")
 		return
 	}
 
@@ -317,17 +317,22 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	//Check if key already exists
 	for i := range x[normalized] {
 		if thiskey.Serial == x[normalized][i].Serial {
-			s.ChannelMessageSend(m.ChannelID, "Key already entered")
+			SendEmbed(s, m.ChannelID, "", "Already Exists", "Key already entered in database")
 			return
 		}
 	}
 
 	//Add new key and notify user and channel, then save to disk
 	x[normalized] = append(x[normalized], thiskey)
-	stringout := []string{"Thanks ", thiskey.Author, " for adding a key for ", thiskey.GameName,
-		". There are now ", strconv.Itoa(len(x[normalized])), " keys for ", thiskey.GameName}
-	s.ChannelMessageSend(config.BroadcastChannel, strings.Join(stringout, ""))
-	s.ChannelMessageSend(m.ChannelID, strings.Join(stringout, ""))
+
+	SendEmbed(s, config.BroadcastChannel, "", "All Praise "+thiskey.Author, "Thanks "+thiskey.Author+
+		" for adding a key for "+thiskey.GameName+". There are now "+strconv.Itoa(len(x[normalized]))+
+		" keys for "+thiskey.GameName)
+
+	SendEmbed(s, m.ChannelID, "", "All Praise "+thiskey.Author, "Thanks "+thiskey.Author+
+		" for adding a key for "+thiskey.GameName+". There are now "+strconv.Itoa(len(x[normalized]))+
+		" keys for "+thiskey.GameName)
+
 	Save(config.DbFile, x)
 }
 
@@ -373,6 +378,23 @@ func Load(path string, object interface{}) {
 	json.Unmarshal(b, &object)
 	fileh.Close()
 	return
+}
+
+//SendEmbed will send an embed msg
+func SendEmbed(s *discordgo.Session, channelID string, title string, fieldTitle string, field string) {
+	if title != "" {
+		embed := NewEmbed().
+			SetTitle(title).
+			AddField(fieldTitle, field).
+			SetColor(embedColor).MessageEmbed
+		s.ChannelMessageSendEmbed(channelID, embed)
+	} else {
+		embed := NewEmbed().
+			AddField(fieldTitle, field).
+			SetColor(embedColor).MessageEmbed
+		s.ChannelMessageSendEmbed(channelID, embed)
+	}
+
 }
 
 //Embed ...
