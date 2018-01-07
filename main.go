@@ -94,7 +94,7 @@ func main() {
 	}
 
 	Load(config.DbFile, x)
-
+	checkDB()
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
@@ -110,6 +110,24 @@ func main() {
 
 	// Cleanly close down the Discord session.
 	dg.Close()
+}
+
+//checkDB
+// This scans the map to make sure all fields exist properly and if not
+// populate them
+func checkDB() {
+
+	Load(config.DbFile, &x)
+	//Check servicetype exists, can add future entries here
+	for i := range x {
+		for k := range x[i] {
+			if x[i][k].ServiceType == "" {
+				x[i][k].ServiceType = getGameServiceString(x[i][k].Serial)
+			}
+		}
+	}
+
+	Save(config.DbFile, x)
 }
 
 // This function will be called (due to AddHandler above) when the bot receives
@@ -200,6 +218,9 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 				foundgame = true
 			}
 			buffer.WriteString(x[keys[i]][0].GameName)
+			buffer.WriteString(" (")
+			buffer.WriteString(getGameServiceString(x[keys[i]][0].Serial))
+			buffer.WriteString(")")
 			buffer.WriteString(": ")
 			buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
 			buffer.WriteString(" keys\n")
@@ -248,13 +269,13 @@ func isOriginMatch(key string) bool {
 	return origin.MatchString(key)
 }
 
-//isUrlMatch
-func isUrlMatch(key string) bool {
+//isURLMatch
+func isURLMatch(key string) bool {
 	return url.MatchString(key)
 }
 
-//getGameString
-func getGameString(key string) string {
+//getGameServiceString
+func getGameServiceString(key string) string {
 
 	if isGogMatch(key) {
 		return "GOG"
@@ -266,7 +287,7 @@ func getGameString(key string) string {
 		return "Uplay"
 	} else if isOriginMatch(key) {
 		return "Origin"
-	} else if isUrlMatch(key) {
+	} else if isURLMatch(key) {
 		return "Gift Link"
 	}
 
@@ -287,7 +308,10 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 		dmchan, _ := s.UserChannelCreate(m.Author.ID)
 
 		//Send the key to the user
-		SendEmbed(s, dmchan.ID, "", "Here is your key", userkey.GameName+": "+userkey.Serial+"\nThis game was brought to you by "+userkey.Author)
+		SendEmbed(s, dmchan.ID, "", "Here is your key", userkey.GameName+" ("+userkey.ServiceType+")"+": "+userkey.Serial+"\nThis game was brought to you by "+userkey.Author)
+		if userkey.ServiceType == "Steam" {
+			SendEmbed(s, dmchan.ID, "", "Steam Redeem Link", "https://store.steampowered.com/account/registerkey?key="+userkey.Serial)
+		}
 
 		//Announce to channel
 		SendEmbed(s, config.BroadcastChannel, "", "Another satisfied customer", m.Author.Username+" has just taken a key for "+userkey.GameName+". There are "+
@@ -327,7 +351,7 @@ func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 	for i = range keys {
 		buffer.WriteString(x[keys[i]][0].GameName)
 		buffer.WriteString(" (")
-		buffer.WriteString(getGameString(x[keys[i]][0].Serial))
+		buffer.WriteString(getGameServiceString(x[keys[i]][0].Serial))
 		buffer.WriteString(")")
 		buffer.WriteString(" : ")
 		buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
@@ -383,6 +407,8 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	thiskey.Author = m.Author.Username
 	thiskey.GameName = gamename
 	thiskey.Serial = key
+	thiskey.ServiceType = getGameServiceString(thiskey.Serial)
+
 	Load(config.DbFile, &x)
 
 	//Check if key already exists
@@ -397,11 +423,11 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	x[normalized] = append(x[normalized], thiskey)
 
 	SendEmbed(s, config.BroadcastChannel, "", "All Praise "+thiskey.Author, "Thanks "+thiskey.Author+
-		" for adding a key for "+thiskey.GameName+". There are now "+strconv.Itoa(len(x[normalized]))+
+		" for adding a key for "+thiskey.GameName+" ("+thiskey.ServiceType+"). There are now "+strconv.Itoa(len(x[normalized]))+
 		" keys for "+thiskey.GameName)
 
 	SendEmbed(s, m.ChannelID, "", "All Praise "+thiskey.Author, "Thanks "+thiskey.Author+
-		" for adding a key for "+thiskey.GameName+". There are now "+strconv.Itoa(len(x[normalized]))+
+		" for adding a key for "+thiskey.GameName+" ("+thiskey.ServiceType+"). There are now "+strconv.Itoa(len(x[normalized]))+
 		" keys for "+thiskey.GameName)
 
 	Save(config.DbFile, x)
