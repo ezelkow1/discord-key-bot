@@ -313,6 +313,9 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 			SendEmbed(s, dmchan.ID, "", "Steam Redeem Link", "https://store.steampowered.com/account/registerkey?key="+userkey.Serial)
 		}
 
+		if userkey.ServiceType == "GOG" {
+			SendEmbed(s, dmchan.ID, "", "GOG Redeem Link", "https://www.gog.com/redeem/"+userkey.Serial)
+		}
 		//Announce to channel
 		SendEmbed(s, config.BroadcastChannel, "", "Another satisfied customer", m.Author.Username+" has just taken a key for "+userkey.GameName+". There are "+
 			strconv.Itoa(len(x[normalized]))+" keys remaining")
