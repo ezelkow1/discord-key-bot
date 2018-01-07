@@ -93,7 +93,7 @@ func main() {
 
 	}
 
-	Load(config.DbFile, x)
+	Load(config.DbFile, &x)
 	checkDB()
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
@@ -116,8 +116,6 @@ func main() {
 // This scans the map to make sure all fields exist properly and if not
 // populate them
 func checkDB() {
-
-	Load(config.DbFile, &x)
 	//Check servicetype exists, can add future entries here
 	for i := range x {
 		for k := range x[i] {
@@ -127,7 +125,7 @@ func checkDB() {
 		}
 	}
 
-	Save(config.DbFile, x)
+	Save(config.DbFile, &x)
 }
 
 // This function will be called (due to AddHandler above) when the bot receives
@@ -301,6 +299,7 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 	gamename := m.Content
 	normalized := NormalizeGame(gamename)
 
+	Load(config.DbFile, &x)
 	//We need to pop off a game, if it exists
 	if len(x[normalized]) > 0 {
 		var userkey GameKey
@@ -325,7 +324,7 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 			delete(x, normalized)
 		}
 
-		Save(config.DbFile, x)
+		Save(config.DbFile, &x)
 
 	} else {
 		SendEmbed(s, m.ChannelID, "", "WHY U DO DIS?", gamename+" doesn't exist you cheeky bastard!")
@@ -433,7 +432,7 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 		" for adding a key for "+thiskey.GameName+" ("+thiskey.ServiceType+"). There are now "+strconv.Itoa(len(x[normalized]))+
 		" keys for "+thiskey.GameName)
 
-	Save(config.DbFile, x)
+	Save(config.DbFile, &x)
 }
 
 //CleanKey cleans up the input name. Strips trailing key from input
