@@ -17,9 +17,10 @@ import (
 
 //GameKey struct
 type GameKey struct {
-	Author   string
-	GameName string
-	Serial   string
+	Author      string
+	GameName    string
+	Serial      string
+	ServiceType string
 }
 
 //Configuration for bot
@@ -33,6 +34,13 @@ type Configuration struct {
 var (
 	config     = Configuration{}
 	re         = regexp.MustCompile(`.*\s`)
+	gog        = regexp.MustCompile(`[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
+	steamOne   = regexp.MustCompile(`[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
+	steamTwo   = regexp.MustCompile(`[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
+	ps3        = regexp.MustCompile(`[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	uplayOne   = regexp.MustCompile(`[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	uplayTwo   = regexp.MustCompile(`[a-z,A-Z,0-9]{3}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	origin     = regexp.MustCompile(`[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
 	x          = make(map[string][]GameKey)
 	configfile string
 	embedColor = 0x00ff00
@@ -83,6 +91,7 @@ func main() {
 		newFile.Close()
 
 	}
+
 	Load(config.DbFile, x)
 
 	// Open a websocket connection to Discord and begin listening.
@@ -193,6 +202,9 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 			buffer.WriteString(": ")
 			buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
 			buffer.WriteString(" keys\n")
+			if isGogMatch(x[keys[i]][0].Serial) {
+				buffer.WriteString(" KEY IS GOG KEY\n")
+			}
 		}
 	}
 
@@ -203,6 +215,57 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	SendEmbed(s, m.ChannelID, "", "Search Results", output)
+}
+
+//isGogMatch
+func isGogMatch(key string) bool {
+	return gog.MatchString(key)
+}
+
+//isSteamMatch
+func isSteamMatch(key string) bool {
+	if steamOne.MatchString(key) || steamTwo.MatchString(key) {
+		return true
+	}
+
+	return false
+}
+
+//isPs3Match
+func isPs3Match(key string) bool {
+	return ps3.MatchString(key)
+}
+
+//isUplayMatch
+func isUplayMatch(key string) bool {
+	if uplayOne.MatchString(key) || uplayTwo.MatchString(key) {
+		return true
+	}
+
+	return false
+}
+
+//isOriginMatch
+func isOriginMatch(key string) bool {
+	return origin.MatchString(key)
+}
+
+//getGameString
+func getGameString(key string) string {
+
+	if isGogMatch(key) {
+		return "GOG"
+	} else if isSteamMatch(key) {
+		return "Steam"
+	} else if isPs3Match(key) {
+		return "PS3"
+	} else if isUplayMatch(key) {
+		return "Uplay"
+	} else if isOriginMatch(key) {
+		return "Origin"
+	}
+
+	return "Unknown"
 }
 
 //GrabKey will grab one of the keys for the current game, pop it, and save
@@ -258,6 +321,9 @@ func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 	i := 0
 	for i = range keys {
 		buffer.WriteString(x[keys[i]][0].GameName)
+		buffer.WriteString(" (")
+		buffer.WriteString(getGameString(x[keys[i]][0].Serial))
+		buffer.WriteString(")")
 		buffer.WriteString(" : ")
 		buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
 		buffer.WriteString(" keys\n")
