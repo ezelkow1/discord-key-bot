@@ -34,13 +34,14 @@ type Configuration struct {
 var (
 	config     = Configuration{}
 	re         = regexp.MustCompile(`.*\s`)
-	gog        = regexp.MustCompile(`[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
-	steamOne   = regexp.MustCompile(`[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
-	steamTwo   = regexp.MustCompile(`[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
-	ps3        = regexp.MustCompile(`[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
-	uplayOne   = regexp.MustCompile(`[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
-	uplayTwo   = regexp.MustCompile(`[a-z,A-Z,0-9]{3}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
-	origin     = regexp.MustCompile(`[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	gog        = regexp.MustCompile(`^[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
+	steamOne   = regexp.MustCompile(`^[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
+	steamTwo   = regexp.MustCompile(`^[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
+	ps3        = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	uplayOne   = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	uplayTwo   = regexp.MustCompile(`^[a-z,A-Z,0-9]{3}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	origin     = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	url        = regexp.MustCompile(`^http`)
 	x          = make(map[string][]GameKey)
 	configfile string
 	embedColor = 0x00ff00
@@ -202,9 +203,6 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 			buffer.WriteString(": ")
 			buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
 			buffer.WriteString(" keys\n")
-			if isGogMatch(x[keys[i]][0].Serial) {
-				buffer.WriteString(" KEY IS GOG KEY\n")
-			}
 		}
 	}
 
@@ -250,6 +248,11 @@ func isOriginMatch(key string) bool {
 	return origin.MatchString(key)
 }
 
+//isUrlMatch
+func isUrlMatch(key string) bool {
+	return url.MatchString(key)
+}
+
 //getGameString
 func getGameString(key string) string {
 
@@ -263,6 +266,8 @@ func getGameString(key string) string {
 		return "Uplay"
 	} else if isOriginMatch(key) {
 		return "Origin"
+	} else if isUrlMatch(key) {
+		return "Gift Link"
 	}
 
 	return "Unknown"
