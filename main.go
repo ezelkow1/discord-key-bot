@@ -133,7 +133,7 @@ func checkDB() {
 func ready(s *discordgo.Session, event *discordgo.Ready) {
 
 	// Set the playing status.
-	s.UpdateStatus(0, "keys go in my piehole")
+	s.UpdateStatus(0, " ")
 	SendEmbed(s, config.BroadcastChannel, "", "I iz here", "Keybot has arrived. You may now use me like the dumpster I am")
 }
 
