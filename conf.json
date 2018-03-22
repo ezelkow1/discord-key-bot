@@ -1,5 +1,6 @@
 {
 	"Token": "Enter your bot token here",
 	"BroadcastChannel": "Channel ID number of your broadcast channel (enable dev options in discord, right click on channel and copy ID",
-	"DbFile": "Name of file for database"
+	"DbFile": "Name of file for database",
+	"KeyRole": ""
 }

@@ -28,6 +28,7 @@ type Configuration struct {
 	Token            string
 	BroadcastChannel string
 	DbFile           string
+	KeyRole          string
 }
 
 // Variables used for command line parameters or global
@@ -188,7 +189,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 func PrintHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var buffer bytes.Buffer
 	buffer.WriteString("!add game name key - this will add a new key to the database. This should be done in a DM with the bot\n")
-	buffer.WriteString("!listkeys - Lists current games and the number of available keys\n")
+	buffer.WriteString("!listkeys - PLEASE USE THIS IN A PRIVATE MESSAGE WITH THE BOT. Lists current games and the number of available keys\n")
 	buffer.WriteString("!take game name - Will give you one of the keys for the game in a DM\n")
 	buffer.WriteString("!search search-string - Will search the database for matching games")
 	SendEmbed(s, m.ChannelID, "", "Available Commands", buffer.String())
