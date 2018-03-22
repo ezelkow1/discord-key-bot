@@ -139,7 +139,7 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 	if initialized == false {
 		// Set the playing status.
 		s.UpdateStatus(0, "")
-		SendEmbed(s, config.BroadcastChannel, "", "I iz here", "Keybot has arrived. You may now use me like the dumpster I am")
+		//SendEmbed(s, config.BroadcastChannel, "", "I iz here", "Keybot has arrived. You may now use me like the dumpster I am")
 		initialized = true
 	}
 }
