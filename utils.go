@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/bwmarrin/discordgo"
 	"os"
 	"strings"
 )
@@ -107,4 +108,43 @@ func Load(path string, object interface{}) {
 	json.Unmarshal(b, &object)
 	fileh.Close()
 	return
+}
+
+// This function refreshes the roleID
+func refreshRoles(s *discordgo.Session) {
+
+	if config.KeyRole != "" {
+		roles, err := s.GuildRoles(guildID)
+
+		if err == nil {
+			for roleids := range roles {
+				if roles[roleids].Name == config.KeyRole {
+					roleID = roles[roleids].ID
+				}
+			}
+		}
+	}
+}
+
+// This will determine if a user is a member of the
+// proper keys role or not
+func isUserRoleAllowed(s *discordgo.Session, m *discordgo.MessageCreate) bool {
+
+	if config.KeyRole != "" {
+		refreshRoles(s)
+		member, _ := s.GuildMember(guildID, m.Author.ID)
+		if len(member.Roles) > 0 {
+			for memberrole := range member.Roles {
+				if member.Roles[memberrole] == roleID {
+					//We found our keys roleID in the members list
+					return true
+				}
+			}
+		}
+	} else {
+		// If no keyrole is set then just let everyone through
+		return true
+	}
+
+	return false
 }

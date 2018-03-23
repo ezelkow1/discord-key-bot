@@ -47,6 +47,8 @@ var (
 	configfile  string
 	embedColor  = 0x00ff00
 	initialized = false
+	guildID     string
+	roleID      string
 )
 
 func init() {
@@ -140,7 +142,9 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 		// Set the playing status.
 		s.UpdateStatus(0, "")
 		//SendEmbed(s, config.BroadcastChannel, "", "I iz here", "Keybot has arrived. You may now use me like the dumpster I am")
+		guildID = event.Guilds[0].ID
 		initialized = true
+		refreshRoles(s)
 	}
 }
 
@@ -151,6 +155,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore all messages created by the bot itself
 	// This isn't required in this specific example but it's a good practice.
 	if m.Author.ID == s.State.User.ID {
+		return
+	}
+
+	// Check if a user has the proper role, if a non-empty role is set
+	if !isUserRoleAllowed(s, m) {
 		return
 	}
 
