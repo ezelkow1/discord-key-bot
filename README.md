@@ -10,3 +10,5 @@ As far as structure the bot will take any !add-ed keys, normalize the name by st
 Finally the bot supports searching with !search, just comparing a search substring to any key names, so basically a \*(stripped tolower string)\*
 
 With the addition of roles security this will also break any multi-server usage. If you happen to want to use the bot across multiple servers/guilds then you will not be able to use the role management and should set the field to the default of "" to disable it.
+
+The latest release can be found here: https://github.com/ezelkow1/discord-key-bot/releases/latest
