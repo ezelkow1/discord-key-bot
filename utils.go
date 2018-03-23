@@ -148,3 +148,19 @@ func isUserRoleAllowed(s *discordgo.Session, m *discordgo.MessageCreate) bool {
 
 	return false
 }
+
+// Check if a msg has a prefix we care about. This is for
+// optimization so we can skip any messages we dont care about.
+// If adding new message triggers they must be added here
+func checkPrefix(msg string) bool {
+
+	if (msg == "!listkeys") ||
+		(strings.HasPrefix(msg, "!add ") == true) ||
+		(strings.HasPrefix(msg, "!take ") == true) ||
+		(strings.HasPrefix(msg, "!search ") == true) ||
+		(strings.HasPrefix(msg, "!help") == true) {
+		return true
+	}
+
+	return false
+}

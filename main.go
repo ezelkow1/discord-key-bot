@@ -142,9 +142,12 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 		// Set the playing status.
 		s.UpdateStatus(0, "")
 		//SendEmbed(s, config.BroadcastChannel, "", "I iz here", "Keybot has arrived. You may now use me like the dumpster I am")
-		guildID = event.Guilds[0].ID
+		if config.KeyRole != "" {
+			guildID = event.Guilds[0].ID
+			refreshRoles(s)
+		}
+
 		initialized = true
-		refreshRoles(s)
 	}
 }
 
@@ -153,19 +156,23 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	// Ignore all messages created by the bot itself
-	// This isn't required in this specific example but it's a good practice.
 	if m.Author.ID == s.State.User.ID {
-		return
-	}
-
-	// Check if a user has the proper role, if a non-empty role is set
-	if !isUserRoleAllowed(s, m) {
 		return
 	}
 
 	// Only allow messages in either DM or broadcast channel
 	dmchan, _ := s.UserChannelCreate(m.Author.ID)
 	if (m.ChannelID != config.BroadcastChannel) && (m.ChannelID != dmchan.ID) {
+		return
+	}
+
+	// Skip any messages we dont care about
+	if checkPrefix(m.Content) == false {
+		return
+	}
+
+	// Check if a user has the proper role, if a non-empty role is set
+	if !isUserRoleAllowed(s, m) {
 		return
 	}
 
