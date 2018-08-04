@@ -161,7 +161,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// Only allow messages in either DM or broadcast channel
-	dmchan, _ := s.UserChannelCreate(m.Author.ID)
+	dmchan, err := s.UserChannelCreate(m.Author.ID)
+
+	if err != nil {
+		fmt.Println("error: ", err)
+		fmt.Println("messageCreate err in creating dmchan")
+		return
+	}
+
 	if (m.ChannelID != config.BroadcastChannel) && (m.ChannelID != dmchan.ID) {
 		return
 	}
