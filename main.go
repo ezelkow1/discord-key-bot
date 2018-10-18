@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/bwmarrin/discordgo"
 	"os"
 	"os/signal"
 	"regexp"
@@ -13,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 //GameKey struct
@@ -29,26 +30,32 @@ type Configuration struct {
 	BroadcastChannel string
 	DbFile           string
 	KeyRole          string
+	UserFile         string
 }
 
 // Variables used for command line parameters or global
 var (
-	config      = Configuration{}
-	re          = regexp.MustCompile(`.*\s`)
-	gog         = regexp.MustCompile(`^[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
-	steamOne    = regexp.MustCompile(`^[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
-	steamTwo    = regexp.MustCompile(`^[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
-	ps3         = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
-	uplayOne    = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
-	uplayTwo    = regexp.MustCompile(`^[a-z,A-Z,0-9]{3}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
-	origin      = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
-	url         = regexp.MustCompile(`^http`)
-	x           = make(map[string][]GameKey)
+	config   = Configuration{}
+	re       = regexp.MustCompile(`.*\s`)
+	gog      = regexp.MustCompile(`^[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
+	steamOne = regexp.MustCompile(`^[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
+	steamTwo = regexp.MustCompile(`^[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}-[a-z,A-Z,0-9]{5}$`)
+	ps3      = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	uplayOne = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	uplayTwo = regexp.MustCompile(`^[a-z,A-Z,0-9]{3}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	origin   = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
+	url      = regexp.MustCompile(`^http`)
+	// Game key Database
+	x = make(map[string][]GameKey)
+
+	// Optional user database for tracking
+	userList    = make(map[string][]string)
 	configfile  string
 	embedColor  = 0x00ff00
 	initialized = false
 	guildID     string
 	roleID      string
+	limitUsers  = false
 )
 
 func init() {
@@ -104,6 +111,11 @@ func main() {
 	if err != nil {
 		fmt.Println("error opening connection,", err)
 		return
+	}
+
+	if config.UserFile != "" {
+		limitUsers = true
+		Load(config.UserFile, &userList)
 	}
 
 	// Wait here until CTRL-C or other term signal is received.
@@ -206,6 +218,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if strings.HasPrefix(m.Content, "!help") == true {
 		PrintHelp(s, m)
 	}
+
+	if strings.HasPrefix(m.Content, "!mygames") == true {
+		PrintMyGames(s, m)
+	}
 }
 
 //PrintHelp will print out the help dialog
@@ -214,6 +230,9 @@ func PrintHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 	buffer.WriteString("!add game name key - this will add a new key to the database. This should be done in a DM with the bot\n")
 	buffer.WriteString("!listkeys - PLEASE USE THIS IN A PRIVATE MESSAGE WITH THE BOT. Lists current games and the number of available keys\n")
 	buffer.WriteString("!take game name - Will give you one of the keys for the game in a DM\n")
+	if limitUsers {
+		buffer.WriteString("!mygames - Will give a list of games you have taken")
+	}
 	buffer.WriteString("!search search-string - Will search the database for matching games")
 	SendEmbed(s, m.ChannelID, "", "Available Commands", buffer.String())
 }
@@ -301,6 +320,26 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 	} else {
 		SendEmbed(s, m.ChannelID, "", "WHY U DO DIS?", gamename+" doesn't exist you cheeky bastard!")
 	}
+}
+
+//PrintMyGames will print out the list of games a user has taken
+func PrintMyGames(s *discordgo.Session, m *discordgo.MessageCreate) {
+	Load(config.UserFile, &userList)
+	if len(userList) == 0 {
+		SendEmbed(s, m.ChannelID, "", "Empty User List", "No users present in list")
+		return
+	}
+
+	list := userList[m.Author.Username]
+	var buffer bytes.Buffer
+
+	for i := range list {
+		buffer.WriteString(userList[m.Author.Username][i])
+		buffer.WriteString("\n")
+	}
+
+	SendEmbed(s, m.ChannelID, "", "Game List", buffer.String())
+	return
 }
 
 //ListKeys lists what games and how many keys for each
