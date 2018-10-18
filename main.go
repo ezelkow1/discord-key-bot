@@ -283,6 +283,19 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	SendEmbed(s, m.ChannelID, "", "Search Results", output)
 }
 
+//CheckUserLimitAllowed to see if a user has this normalized game name in their taken list
+func CheckUserLimitAllowed(s *discordgo.Session, m *discordgo.MessageCreate, gamename string) bool {
+
+	if limitUsers == false {
+		// We aren't doing user limiting, always allow
+		return true
+	} else {
+		Load(config.UserFile, &userList)
+	}
+
+	return false
+}
+
 //GrabKey will grab one of the keys for the current game, pop it, and save
 func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Clean up content
@@ -291,8 +304,22 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 	normalized := NormalizeGame(gamename)
 
 	Load(config.DbFile, &x)
+
+	allowed := CheckUserLimitAllowed(s, m, gamename)
+
+	// User already took this game
+	if !allowed {
+		dmchan, _ := s.UserChannelCreate(m.Author.ID)
+		SendEmbed(s, dmchan.ID, "", "Access Denied", "You have already received a copy of "+gamename)
+		return
+	} else if limitUsers {
+		//User limiting enabled and user allowed, add game
+		userList[m.Author.Username] = append(userList[m.Author.Username], gamename)
+		Save(config.UserFile, &userList)
+	}
+
 	//We need to pop off a game, if it exists
-	if len(x[normalized]) > 0 {
+	if len(x[normalized]) > 0 && allowed {
 		var userkey GameKey
 		userkey, x[normalized] = x[normalized][0], x[normalized][1:]
 		dmchan, _ := s.UserChannelCreate(m.Author.ID)
