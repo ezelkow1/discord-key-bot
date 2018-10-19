@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/bwmarrin/discordgo"
 	"os"
 	"strings"
+
+	"github.com/bwmarrin/discordgo"
 )
 
 //isGogMatch
@@ -158,7 +159,8 @@ func checkPrefix(msg string) bool {
 		(strings.HasPrefix(msg, "!add ") == true) ||
 		(strings.HasPrefix(msg, "!take ") == true) ||
 		(strings.HasPrefix(msg, "!search ") == true) ||
-		(strings.HasPrefix(msg, "!help") == true) {
+		(strings.HasPrefix(msg, "!help") == true) ||
+		(msg == "!mygames") {
 		return true
 	}
 
