@@ -115,7 +115,15 @@ func main() {
 
 	if config.UserFile != "" {
 		limitUsers = true
+		if _, err := os.Stat(config.UserFile); os.IsNotExist(err) {
+			fmt.Println("User File does not exist, creating")
+			newFile, _ := os.Create(config.UserFile)
+			newFile.Close()
+		}
+
 		Load(config.UserFile, &userList)
+	} else {
+		fmt.Println("No user db specified, not limiting users")
 	}
 
 	// Wait here until CTRL-C or other term signal is received.
@@ -182,6 +190,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if (m.ChannelID != config.BroadcastChannel) && (m.ChannelID != dmchan.ID) {
+		fmt.Println("not allowed to say nothin")
 		return
 	}
 
@@ -192,6 +201,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	// Check if a user has the proper role, if a non-empty role is set
 	if !isUserRoleAllowed(s, m) {
+		fmt.Println("user role not allowed")
 		return
 	}
 
@@ -219,8 +229,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		PrintHelp(s, m)
 	}
 
-	if strings.HasPrefix(m.Content, "!mygames") == true {
-		PrintMyGames(s, m)
+	if m.Content == "!mygames" {
+		if limitUsers {
+			PrintMyGames(s, m)
+		}
 	}
 }
 
@@ -231,7 +243,7 @@ func PrintHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 	buffer.WriteString("!listkeys - PLEASE USE THIS IN A PRIVATE MESSAGE WITH THE BOT. Lists current games and the number of available keys\n")
 	buffer.WriteString("!take game name - Will give you one of the keys for the game in a DM\n")
 	if limitUsers {
-		buffer.WriteString("!mygames - Will give a list of games you have taken")
+		buffer.WriteString("!mygames - Will give a list of games you have taken\n")
 	}
 	buffer.WriteString("!search search-string - Will search the database for matching games")
 	SendEmbed(s, m.ChannelID, "", "Available Commands", buffer.String())
@@ -289,11 +301,19 @@ func CheckUserLimitAllowed(s *discordgo.Session, m *discordgo.MessageCreate, gam
 	if limitUsers == false {
 		// We aren't doing user limiting, always allow
 		return true
-	} else {
-		Load(config.UserFile, &userList)
 	}
 
-	return false
+	Load(config.UserFile, &userList)
+	normalized := NormalizeGame(gamename)
+	//keys := make([]string, 0, len(userList[m.Author.Username]))
+	for key := range userList[m.Author.Username] {
+		//keys = append(keys, key)
+		if strings.Compare(NormalizeGame(userList[m.Author.Username][key]), normalized) == 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 //GrabKey will grab one of the keys for the current game, pop it, and save
@@ -352,6 +372,7 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 //PrintMyGames will print out the list of games a user has taken
 func PrintMyGames(s *discordgo.Session, m *discordgo.MessageCreate) {
 	Load(config.UserFile, &userList)
+
 	if len(userList) == 0 {
 		SendEmbed(s, m.ChannelID, "", "Empty User List", "No users present in list")
 		return
@@ -359,6 +380,8 @@ func PrintMyGames(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	list := userList[m.Author.Username]
 	var buffer bytes.Buffer
+
+	sort.Strings(list)
 
 	for i := range list {
 		buffer.WriteString(userList[m.Author.Username][i])
