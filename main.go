@@ -190,7 +190,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	if (m.ChannelID != config.BroadcastChannel) && (m.ChannelID != dmchan.ID) {
-		fmt.Println("not allowed to say nothin")
 		return
 	}
 
@@ -201,7 +200,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	// Check if a user has the proper role, if a non-empty role is set
 	if !isUserRoleAllowed(s, m) {
-		fmt.Println("user role not allowed")
 		return
 	}
 
