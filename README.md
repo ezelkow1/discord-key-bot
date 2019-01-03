@@ -19,6 +19,6 @@ The latest release can be found here: https://github.com/ezelkow1/discord-key-bo
 # Addendum
 There are a couple of new options that dont really have default values but you can use them by setting the values in the config file:
 
-UserFile - this is string just like the database file. If this is set the bot will start keeping track of users and what games they take. It will prevent users from taking more than one key from any single game. This can be handy if you are using the bot for some sort of mass key distribution setup
+UserFile - this is a string just like the database file. If this is set the bot will start keeping track of users and what games they take. It will prevent users from taking more than one key from any single game. This can be handy if you are using the bot for some sort of mass key distribution setup
 
 ListPMOnly - this is a boolean (set using true or false without quotations). The default is already false so you only need to use this if you want to set it to true. Setting true will prevent the bot from doing a full key list inside the broadcast channel. This can be really handy for when you start to get past ~100 keys or so, so people dont inadvertently (or on purpose) end up having the bot spam your channel with a key listing
