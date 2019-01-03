@@ -12,3 +12,11 @@ Finally the bot supports searching with !search, just comparing a search substri
 With the addition of roles security this will also break any multi-server usage. If you happen to want to use the bot across multiple servers/guilds then you will not be able to use the role management and should set the field to the default of "" to disable it.
 
 The latest release can be found here: https://github.com/ezelkow1/discord-key-bot/releases/latest
+
+
+Addendum:
+There are a couple of new options that dont really have default values but you can use them by setting the values in the config file:
+
+UserFile - this is string just like the database file. If this is set the bot will start keeping track of users and what games they take. It will prevent users from taking more than one key from any single game. This can be handy if you are using the bot for some sort of mass key distribution setup
+
+ListPMOnly - this is a boolean (set using true or false without quotations). The default is already false so you only need to use this if you want to set it to true. Setting true will prevent the bot from doing a full key list inside the broadcast channel. This can be really handy for when you start to get past ~100 keys or so, so people dont inadvertently (or on purpose) end up having the bot spam your channel with a key listing
