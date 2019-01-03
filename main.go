@@ -31,6 +31,7 @@ type Configuration struct {
 	DbFile           string
 	KeyRole          string
 	UserFile         string
+	ListPMOnly       string
 }
 
 // Variables used for command line parameters or global
