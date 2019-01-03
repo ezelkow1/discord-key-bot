@@ -14,7 +14,9 @@ With the addition of roles security this will also break any multi-server usage.
 The latest release can be found here: https://github.com/ezelkow1/discord-key-bot/releases/latest
 
 
-Addendum:
+
+
+# Addendum
 There are a couple of new options that dont really have default values but you can use them by setting the values in the config file:
 
 UserFile - this is string just like the database file. If this is set the bot will start keeping track of users and what games they take. It will prevent users from taking more than one key from any single game. This can be handy if you are using the bot for some sort of mass key distribution setup
