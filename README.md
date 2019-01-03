@@ -12,12 +12,14 @@ Finally the bot supports searching with !search, just comparing a search substri
 With the addition of roles security this will also break any multi-server usage. If you happen to want to use the bot across multiple servers/guilds then you will not be able to use the role management and should set the field to the default of "" to disable it.
 
 The commands are (from the !help command):
-```!add game name key - this will add a new key to the database. This should be done in a DM with the bot
+```
+!add game name key - this will add a new key to the database. This should be done in a DM with the bot
 !listkeys - PLEASE USE THIS IN A PRIVATE MESSAGE WITH THE BOT. Lists current games and the number of available keys
 !take game name - Will give you one of the keys for the game in a DM
 !mygames - Will give a list of games you have taken (this is only active when you are using a user database explained below)
-!search search-string - Will search the database for matching games```
-  
+!search search-string - Will search the database for matching games
+```
+
 The latest release can be found here: https://github.com/ezelkow1/discord-key-bot/releases/latest
 
 
