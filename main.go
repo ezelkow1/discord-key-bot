@@ -31,6 +31,7 @@ type Configuration struct {
 	DbFile           string
 	KeyRole          string
 	UserFile         string
+	ListPMOnly       bool
 }
 
 // Variables used for command line parameters or global
@@ -393,9 +394,17 @@ func PrintMyGames(s *discordgo.Session, m *discordgo.MessageCreate) {
 //ListKeys lists what games and how many keys for each
 func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 	Load(config.DbFile, &x)
+
 	if len(x) == 0 {
 		SendEmbed(s, m.ChannelID, "", "EMPTY DATABASE", "No Keys present in Database")
 		return
+	}
+
+	if config.ListPMOnly {
+		if m.ChannelID == config.BroadcastChannel {
+			SendEmbed(s, m.ChannelID, "", "Not in here", "Don't do that in here")
+			return
+		}
 	}
 
 	// Lets make this pretty, sort keys by name
