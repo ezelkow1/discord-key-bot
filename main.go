@@ -394,6 +394,7 @@ func PrintMyGames(s *discordgo.Session, m *discordgo.MessageCreate) {
 //ListKeys lists what games and how many keys for each
 func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 	Load(config.DbFile, &x)
+
 	if len(x) == 0 {
 		SendEmbed(s, m.ChannelID, "", "EMPTY DATABASE", "No Keys present in Database")
 		return
