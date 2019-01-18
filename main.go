@@ -33,6 +33,7 @@ type Configuration struct {
 	KeyRole          string
 	UserFile         string
 	ListPMOnly       bool
+	OwnerID          string
 }
 
 // Variables used for command line parameters or global
@@ -237,6 +238,18 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			PrintMyGames(s, m)
 		}
 	}
+
+	if strings.HasPrefix(m.Content, "!speak") == true {
+		if m.Author.ID == config.OwnerID {
+			Speak(s, m)
+		}
+	}
+}
+
+// Speak lets a specified owner ID speak from the bot
+func Speak(s *discordgo.Session, m *discordgo.MessageCreate) {
+	m.Content = strings.TrimPrefix(m.Content, "!speak ")
+	s.ChannelMessageSend(config.BroadcastChannel, m.Content)
 }
 
 //PrintHelp will print out the help dialog
