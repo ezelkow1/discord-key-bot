@@ -160,6 +160,7 @@ func checkPrefix(msg string) bool {
 		(strings.HasPrefix(msg, "!take ") == true) ||
 		(strings.HasPrefix(msg, "!search ") == true) ||
 		(strings.HasPrefix(msg, "!help") == true) ||
+		(strings.HasPrefix(msg, "!speak") == true) ||
 		(msg == "!mygames") {
 		return true
 	}
