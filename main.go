@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
@@ -57,6 +58,7 @@ var (
 	guildID     string
 	roleID      string
 	limitUsers  = false
+	fileLock    sync.RWMutex
 )
 
 func init() {
@@ -105,8 +107,10 @@ func main() {
 
 	}
 
+	fileLock.Lock()
 	Load(config.DbFile, &x)
 	checkDB()
+	fileLock.Unlock()
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
@@ -254,6 +258,9 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	foundgame := false
 	m.Content = strings.TrimPrefix(m.Content, "!search ")
 
+	fileLock.RLock()
+	defer fileLock.RUnlock()
+
 	Load(config.DbFile, &x)
 	if len(x) == 0 {
 		SendEmbed(s, config.BroadcastChannel, "", "Empty Database", "No Keys present in Database")
@@ -322,6 +329,8 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 	gamename := m.Content
 	normalized := NormalizeGame(gamename)
 
+	fileLock.Lock()
+	defer fileLock.Unlock()
 	Load(config.DbFile, &x)
 
 	allowed := CheckUserLimitAllowed(s, m, gamename)
@@ -370,6 +379,9 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 //PrintMyGames will print out the list of games a user has taken
 func PrintMyGames(s *discordgo.Session, m *discordgo.MessageCreate) {
+
+	fileLock.RLock()
+	defer fileLock.RUnlock()
 	Load(config.UserFile, &userList)
 
 	if len(userList) == 0 {
@@ -393,6 +405,9 @@ func PrintMyGames(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 //ListKeys lists what games and how many keys for each
 func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
+
+	fileLock.RLock()
+	defer fileLock.RUnlock()
 	Load(config.DbFile, &x)
 
 	if len(x) == 0 {
@@ -478,6 +493,9 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	thiskey.GameName = gamename
 	thiskey.Serial = key
 	thiskey.ServiceType = getGameServiceString(thiskey.Serial)
+
+	fileLock.Lock()
+	defer fileLock.Unlock()
 
 	Load(config.DbFile, &x)
 
