@@ -239,11 +239,36 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
+	if m.Content == "!totals" {
+		PrintTotals(s, m)
+	}
 	if strings.HasPrefix(m.Content, "!speak") == true {
 		if m.Author.ID == config.OwnerID {
 			Speak(s, m)
 		}
 	}
+}
+
+// PrintTotals prints the total number of games and keys
+func PrintTotals(s *discordgo.Session, m *discordgo.MessageCreate) {
+	fileLock.RLock()
+	defer fileLock.RUnlock()
+	Load(config.DbFile, &x)
+
+	if len(x) == 0 {
+		SendEmbed(s, m.ChannelID, "", "Empty Database", "No keys present in database")
+		return
+	}
+
+	numGames := len(x)
+	numKeys := 0
+
+	for games := range x {
+		numKeys += len(x[games])
+	}
+
+	SendEmbed(s, m.ChannelID, "", "Total Games", "There are "+strconv.Itoa(numGames)+" games with "+strconv.Itoa(numKeys)+" keys")
+	return
 }
 
 // Speak lets a specified owner ID speak from the bot
