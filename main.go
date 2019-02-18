@@ -287,6 +287,7 @@ func PrintHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 		buffer.WriteString("!mygames - Will give a list of games you have taken\n")
 	}
 	buffer.WriteString("!search search-string - Will search the database for matching games")
+	buffer.WriteString("!totals - Will give a total number of games and keys stored")
 	SendEmbed(s, m.ChannelID, "", "Available Commands", buffer.String())
 }
 
