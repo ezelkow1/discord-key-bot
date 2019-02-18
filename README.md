@@ -18,6 +18,7 @@ The commands are (from the !help command):
 !take game name - Will give you one of the keys for the game in a DM
 !mygames - Will give a list of games you have taken (this is only active when you are using a user database explained below)
 !search search-string - Will search the database for matching games
+!totals - Will give a total count of games and the total number of keys stored
 ```
 
 The latest release can be found here: https://github.com/ezelkow1/discord-key-bot/releases/latest
