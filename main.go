@@ -360,8 +360,6 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 		SendEmbed(s, m.ChannelID, "", "Search Results", buffer.String())
 		buffer.Reset()
 	}
-
-	//SendEmbed(s, m.ChannelID, "", "Search Results", output)
 }
 
 //CheckUserLimitAllowed to see if a user has this normalized game name in their taken list
