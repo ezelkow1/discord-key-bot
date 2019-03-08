@@ -281,7 +281,7 @@ func Speak(s *discordgo.Session, m *discordgo.MessageCreate) {
 func PrintHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var buffer bytes.Buffer
 	buffer.WriteString("!add game name key - this will add a new key to the database. This should be done in a DM with the bot\n")
-	buffer.WriteString("!listkeys - PLEASE USE THIS IN A PRIVATE MESSAGE WITH THE BOT. Lists current games and the number of available keys\n")
+	buffer.WriteString("!listkeys - Lists current games and the number of available keys. This should be done in a DM with the bot\n")
 	buffer.WriteString("!take game name - Will give you one of the keys for the game in a DM\n")
 	if limitUsers {
 		buffer.WriteString("!mygames - Will give a list of games you have taken\n")
@@ -311,33 +311,55 @@ func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Lets make this pretty, sort keys by name
 	keys := make([]string, 0, len(x))
 	for key := range x {
-		keys = append(keys, key)
-	}
-
-	var buffer bytes.Buffer
-	var output string
-	for i := range keys {
-		if strings.Contains(keys[i], search) {
-			if !foundgame {
-				foundgame = true
-			}
-			buffer.WriteString(x[keys[i]][0].GameName)
-			buffer.WriteString(" (")
-			buffer.WriteString(getGameServiceString(x[keys[i]][0].Serial))
-			buffer.WriteString(")")
-			buffer.WriteString(": ")
-			buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
-			buffer.WriteString(" keys\n")
+		if strings.Contains(key, search) {
+			keys = append(keys, key)
+			foundgame = true
 		}
 	}
 
-	if foundgame {
-		output = buffer.String()
-	} else {
-		output = "No Matches Found"
+	if !foundgame {
+		SendEmbed(s, m.ChannelID, "", "Search results", "No Matches Found")
+		return
 	}
 
-	SendEmbed(s, m.ChannelID, "", "Search Results", output)
+	sort.Strings(keys)
+
+	var buffer bytes.Buffer
+
+	k := 0
+	dmchan, err := s.UserChannelCreate(m.Author.ID)
+	if err != nil {
+		fmt.Println("error: ", err)
+		fmt.Println("messageCreate err in creating dmchan")
+		return
+	}
+
+	if len(keys) > 20 && (m.ChannelID != dmchan.ID) {
+		SendEmbed(s, m.ChannelID, "", "Too Many Results", "There are too many search results, please do this search in a DM")
+		return
+	}
+
+	for i := range keys {
+		buffer.WriteString(x[keys[i]][0].GameName)
+		buffer.WriteString(" (")
+		buffer.WriteString(getGameServiceString(x[keys[i]][0].Serial))
+		buffer.WriteString(")")
+		buffer.WriteString(": ")
+		buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
+		buffer.WriteString(" keys\n")
+		k++
+
+		if k == 20 {
+			SendEmbed(s, m.ChannelID, "", "Search Results", buffer.String())
+			buffer.Reset()
+			k = 0
+		}
+	}
+
+	if k != 0 {
+		SendEmbed(s, m.ChannelID, "", "Search Results", buffer.String())
+		buffer.Reset()
+	}
 }
 
 //CheckUserLimitAllowed to see if a user has this normalized game name in their taken list
