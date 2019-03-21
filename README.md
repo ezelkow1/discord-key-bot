@@ -1,17 +1,17 @@
 # discord-key-bot
 A bot for discord that accepts, announces, and gives out keys
 
-This requires a conf.json file (or whatever you choose to name the config file). An editable example is provided. It will need your bot token, a channel (using the channel ID number) to use for broadcast messages, the name of the json/db file for key storage, and a KeysRole name if you wish to limit bot communication to a specific role.
+This requires a conf.json file (or whatever you choose to name the config file). An editable example is provided. It requires your bot token, a channel (using the channel ID number) to use for broadcasting messages, the name of the json/db file for key storage, and a KeysRole name if you wish to limit bot communication to a specific role.
 
-In the channel itself the bot will need 'Manage Messages' permission, as the bot will erase any '!add' commands sent in in the channel so that keys do not appear publicly
+The bot will need 'Manage Messages' permission in the channel, as the bot will erase any `!add` commands sent in the channel so that keys do not appear publicly
 
-As far as structure the bot will take any !add-ed keys, normalize the name by stripping whitespace and lowercasing, and that becomes the key to a map. Within each key in the map are individual gamekeys which record the original "pretty" version of the game name, the user who donated, the gamekey, and the service to redeem the key on.  Currently the bot can recognize steam, uplay, origin, ps3, gog, and urls. Any other key will be stored as an 'unknown' type.  If  a key is steam or gog it will also generate a redemption link on a key !take.
+The bot will take any `!add`-ed keys, normalize the name by stripping whitespaces and lowercasing, and that becomes the key to a map. Within each key in the map are individual gamekeys which record the original "pretty" version of the game name, the user who donated, the gamekey, and the service for redeeming the key.  Currently, the bot can recognize Steam, Uplay, Origin, PS3, GOG, and URLs. Any other key will be stored as an 'unknown' type.  If a key is Steam or GOG, it will also generate a redemption link on a key `!take`.
 
-Finally the bot supports searching with !search, just comparing a search substring to any key names, so basically a \*(stripped tolower string)\*
+Finally, the bot supports searching with `!search`, comparing a search substring to any key names, essentially a \*(stripped tolower string)\*
 
-With the addition of roles security this will also break any multi-server usage. If you happen to want to use the bot across multiple servers/guilds then you will not be able to use the role management and should set the field to the default of "" to disable it.
+With the addition of roles' security, multi-server usage is _unavailable_. If the bot is used across multiple servers/guilds, the role management will be unavailable, and should set the field to the default of "" to disable it.
 
-The commands are (from the !help command):
+The commands are (from the `!help` command):
 ```
 !add game name key - this will add a new key to the database. This should be done in a DM with the bot
 !listkeys - PLEASE USE THIS IN A PRIVATE MESSAGE WITH THE BOT. Lists current games and the number of available keys
