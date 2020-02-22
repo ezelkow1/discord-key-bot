@@ -25,4 +25,9 @@ jobs:
         fi
 
     - name: Build
-      run: go build -v .
+      run: 
+        GOOS=linux GOARCH=amd64 go build -v .
+        go clean
+        GOOS=linux GOARCH=386 go build -v .
+        go clean
+        GOOS=windows GOARCH=amd64 go build -v .
