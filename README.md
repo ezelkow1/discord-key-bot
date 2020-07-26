@@ -1,3 +1,5 @@
+![Go](https://github.com/ezelkow1/discord-key-bot/workflows/Go/badge.svg?branch=master)
+
 # discord-key-bot
 A bot for discord that accepts, announces, and gives out keys
 
