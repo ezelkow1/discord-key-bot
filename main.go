@@ -2,28 +2,21 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	_ "github.com/mattn/go-sqlite3"
 )
-
-//GameKey struct
-type GameKey struct {
-	Author      string
-	GameName    string
-	Serial      string
-	ServiceType string
-}
 
 //Configuration for bot
 type Configuration struct {
@@ -48,18 +41,14 @@ var (
 	uplayTwo = regexp.MustCompile(`^[a-z,A-Z,0-9]{3}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
 	origin   = regexp.MustCompile(`^[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}-[a-z,A-Z,0-9]{4}$`)
 	url      = regexp.MustCompile(`^http`)
-	// Game key Database
-	x = make(map[string][]GameKey)
 
-	// Optional user database for tracking
-	userList    = make(map[string][]string)
 	configfile  string
 	embedColor  = 0x00ff00
 	initialized = false
 	guildID     string
 	roleID      string
 	limitUsers  = false
-	fileLock    sync.RWMutex
+	database    *sql.DB
 )
 
 func init() {
@@ -84,6 +73,40 @@ func init() {
 		fmt.Println("error: ", err)
 		os.Exit(3)
 	}
+
+	database, err = sql.Open("sqlite3", config.DbFile)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	statement, err := database.Prepare("CREATE TABLE IF NOT EXISTS games (id INTEGER PRIMARY KEY, normalized TEXT NOT NULL, pretty TEXT NOT NULL, UNIQUE(normalized, pretty))")
+	defer statement.Close()
+	_, err = statement.Exec()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	statement, _ = database.Prepare("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, discordid INTEGER UNIQUE)")
+	_, err = statement.Exec()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	statement, err =
+		database.Prepare("CREATE TABLE IF NOT EXISTS" +
+			" keys (id INTEGER PRIMARY KEY, key TEXT NOT NULL, game_id INTEGER NOT NULL, userid_entered INTEGER NOT NULL, userid_taken INTEGER, service TEXT," +
+			"UNIQUE(key) " +
+			"FOREIGN KEY (game_id) REFERENCES games(id) " +
+			"FOREIGN KEY (userid_entered) REFERENCES users(id) " +
+			"FOREIGN KEY (userid_taken) REFERENCES users(id))")
+
+	_, err = statement.Exec()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 }
 
 func main() {
@@ -95,43 +118,20 @@ func main() {
 		return
 	}
 
+	// Close the DB on shutdown
+	defer database.Close()
+
 	// Register ready as a callback for the ready events.
 	dg.AddHandler(ready)
 
 	// Register messageCreate as a callback for message events
 	dg.AddHandler(messageCreate)
 
-	if _, err := os.Stat(config.DbFile); os.IsNotExist(err) {
-		fmt.Println("Db File does not exist, creating")
-		newFile, _ := os.Create(config.DbFile)
-		newFile.Close()
-
-	}
-
-	fileLock.Lock()
-	Load(config.DbFile, &x)
-	checkDB()
-	fileLock.Unlock()
-	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
-		fmt.Println("error opening connection,", err)
+		fmt.Println("Error opening connection to discord servers, ", err)
 		return
 	}
-
-	if config.UserFile != "" {
-		limitUsers = true
-		if _, err := os.Stat(config.UserFile); os.IsNotExist(err) {
-			fmt.Println("User File does not exist, creating")
-			newFile, _ := os.Create(config.UserFile)
-			newFile.Close()
-		}
-
-		Load(config.UserFile, &userList)
-	} else {
-		fmt.Println("No user db specified, not limiting users")
-	}
-
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
@@ -142,26 +142,9 @@ func main() {
 	dg.Close()
 }
 
-//checkDB
-// This scans the map to make sure all fields exist properly and if not
-// populate them
-func checkDB() {
-	//Check servicetype exists, can add future entries here
-	for i := range x {
-		for k := range x[i] {
-			if x[i][k].ServiceType == "" {
-				x[i][k].ServiceType = getGameServiceString(x[i][k].Serial)
-			}
-		}
-	}
-
-	Save(config.DbFile, &x)
-}
-
 // This function will be called (due to AddHandler above) when the bot receives
 // the "ready" event from Discord.
 func ready(s *discordgo.Session, event *discordgo.Ready) {
-
 	// Discord just loves to send ready events during server hiccups
 	// This prevents spamming
 	if initialized == false {
@@ -251,23 +234,25 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 // PrintTotals prints the total number of games and keys
 func PrintTotals(s *discordgo.Session, m *discordgo.MessageCreate) {
-	fileLock.RLock()
-	defer fileLock.RUnlock()
-	Load(config.DbFile, &x)
-
-	if len(x) == 0 {
-		SendEmbed(s, m.ChannelID, "", "Empty Database", "No keys present in database")
-		return
+	counts, err := database.Query("SELECT COUNT(*) FROM keys")
+	defer counts.Close()
+	if err != nil {
+		SendEmbed(s, m.ChannelID, "", "Total Games", "Error getting keys totals")
+	}
+	var keys int
+	var games int
+	for counts.Next() {
+		counts.Scan(&keys)
+	}
+	counts, err = database.Query("SELECT COUNT(*) FROM games")
+	if err != nil {
+		SendEmbed(s, m.ChannelID, "", "Total Games", "Error getting games totals")
+	}
+	for counts.Next() {
+		counts.Scan(&games)
 	}
 
-	numGames := len(x)
-	numKeys := 0
-
-	for games := range x {
-		numKeys += len(x[games])
-	}
-
-	SendEmbed(s, m.ChannelID, "", "Total Games", "There are "+strconv.Itoa(numGames)+" games with "+strconv.Itoa(numKeys)+" keys")
+	SendEmbed(s, m.ChannelID, "", "Total Games", "There are "+strconv.Itoa(games)+" games with "+strconv.Itoa(keys)+" keys")
 	return
 }
 
@@ -286,7 +271,7 @@ func PrintHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if limitUsers {
 		buffer.WriteString("!mygames - Will give a list of games you have taken\n")
 	}
-	buffer.WriteString("!search search-string - Will search the database for matching games")
+	buffer.WriteString("!search search-string - Will search the database for matching games\n")
 	buffer.WriteString("!totals - Will give a total number of games and keys stored")
 	SendEmbed(s, m.ChannelID, "", "Available Commands", buffer.String())
 }
@@ -294,68 +279,63 @@ func PrintHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 //SearchGame will scan the map keys for a match on the substring
 func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 
-	foundgame := false
 	m.Content = strings.TrimPrefix(m.Content, "!search ")
-
-	fileLock.RLock()
-	defer fileLock.RUnlock()
-
-	Load(config.DbFile, &x)
-	if len(x) == 0 {
-		SendEmbed(s, config.BroadcastChannel, "", "Empty Database", "No Keys present in Database")
-		return
-	}
 
 	search := NormalizeGame(m.Content)
 
-	// Lets make this pretty, sort keys by name
-	keys := make([]string, 0, len(x))
-	for key := range x {
-		if strings.Contains(key, search) {
-			keys = append(keys, key)
-			foundgame = true
-		}
-	}
-
-	if !foundgame {
-		SendEmbed(s, m.ChannelID, "", "Search results", "No Matches Found")
+	// First lets find how many matches we have, maybe its less efficient then doing it all at once?
+	// Either way we dont want to flood a channel if its >20 results so grab the count
+	counts, err := database.Query("SELECT COUNT(*) FROM games WHERE normalized like ?", "%"+search+"%")
+	defer counts.Close()
+	if err != nil {
+		SendEmbed(s, m.ChannelID, "", "Search Results", "Error getting count of games")
 		return
 	}
 
-	sort.Strings(keys)
+	var gamecount int
+	for counts.Next() {
+		counts.Scan(&gamecount)
+	}
+	if gamecount <= 0 {
+		SendEmbed(s, m.ChannelID, "", "Search results", "No Matches Found for: "+search)
+		return
+	}
 
 	var buffer bytes.Buffer
-
 	k := 0
 	dmchan, err := s.UserChannelCreate(m.Author.ID)
 	if err != nil {
-		fmt.Println("error: ", err)
-		fmt.Println("messageCreate err in creating dmchan")
 		return
 	}
 
-	if len(keys) > 20 && (m.ChannelID != dmchan.ID) {
+	if gamecount > 20 && (m.ChannelID != dmchan.ID) {
 		SendEmbed(s, m.ChannelID, "", "Too Many Results", "There are too many search results, please do this search in a DM")
 		return
 	}
 
-	for i := range keys {
-		buffer.WriteString(x[keys[i]][0].GameName)
-		buffer.WriteString(" (")
-		buffer.WriteString(getGameServiceString(x[keys[i]][0].Serial))
-		buffer.WriteString(")")
+	// Collect the matching games for the search and the count of keys based on the games ID value
+	list, err := database.Query("SELECT DISTINCT pretty as name, (SELECT COUNT(*) FROM keys WHERE games.id = game_id) gamecount FROM games INNER JOIN keys on keys.game_id = games.id WHERE games.normalized like ? order by pretty", "%"+search+"%")
+	defer list.Close()
+	if err != nil {
+		SendEmbed(s, m.ChannelID, "", "Search Results", "Error getting list of matching games")
+		return
+	}
+
+	for list.Next() {
+		var name string
+		var count int
+		list.Scan(&name, &count)
+		buffer.WriteString(name)
 		buffer.WriteString(": ")
-		buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
+		buffer.WriteString(strconv.Itoa(count))
 		buffer.WriteString(" keys\n")
 		k++
-
 		if k == 20 {
 			SendEmbed(s, m.ChannelID, "", "Search Results", buffer.String())
 			buffer.Reset()
 			k = 0
 		}
 	}
-
 	if k != 0 {
 		SendEmbed(s, m.ChannelID, "", "Search Results", buffer.String())
 		buffer.Reset()
@@ -370,15 +350,7 @@ func CheckUserLimitAllowed(s *discordgo.Session, m *discordgo.MessageCreate, gam
 		return true
 	}
 
-	Load(config.UserFile, &userList)
-	normalized := NormalizeGame(gamename)
-	//keys := make([]string, 0, len(userList[m.Author.Username]))
-	for key := range userList[m.Author.Username] {
-		//keys = append(keys, key)
-		if strings.Compare(NormalizeGame(userList[m.Author.Username][key]), normalized) == 0 {
-			return false
-		}
-	}
+	//normalized := NormalizeGame(gamename)
 
 	return true
 }
@@ -388,11 +360,7 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Clean up content
 	m.Content = strings.TrimPrefix(m.Content, "!take ")
 	gamename := m.Content
-	normalized := NormalizeGame(gamename)
-
-	fileLock.Lock()
-	defer fileLock.Unlock()
-	Load(config.DbFile, &x)
+	//normalized := NormalizeGame(gamename)
 
 	allowed := CheckUserLimitAllowed(s, m, gamename)
 
@@ -403,35 +371,15 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	} else if limitUsers {
 		//User limiting enabled and user allowed, add game
-		userList[m.Author.Username] = append(userList[m.Author.Username], gamename)
-		Save(config.UserFile, &userList)
+		//userList[m.Author.Username] = append(userList[m.Author.Username], gamename)
 	}
 
 	//We need to pop off a game, if it exists
-	if len(x[normalized]) > 0 && allowed {
-		var userkey GameKey
-		userkey, x[normalized] = x[normalized][0], x[normalized][1:]
-		dmchan, _ := s.UserChannelCreate(m.Author.ID)
-
+	if true {
 		//Send the key to the user
-		SendEmbed(s, dmchan.ID, "", "Here is your key", userkey.GameName+" ("+userkey.ServiceType+")"+": "+userkey.Serial+"\nThis game was brought to you by "+userkey.Author)
-		if userkey.ServiceType == "Steam" {
-			SendEmbed(s, dmchan.ID, "", "Steam Redeem Link", "https://store.steampowered.com/account/registerkey?key="+userkey.Serial)
-		}
-
-		if userkey.ServiceType == "GOG" {
-			SendEmbed(s, dmchan.ID, "", "GOG Redeem Link", "https://www.gog.com/redeem/"+userkey.Serial)
-		}
 		//Announce to channel
-		SendEmbed(s, config.BroadcastChannel, "", "Another satisfied customer", m.Author.Username+" has just taken a key for "+userkey.GameName+". There are "+
-			strconv.Itoa(len(x[normalized]))+" keys remaining")
 
 		//If no more keys, remove entry in map
-		if len(x[normalized]) == 0 {
-			delete(x, normalized)
-		}
-
-		Save(config.DbFile, &x)
 
 	} else {
 		SendEmbed(s, m.ChannelID, "", "WHY U DO DIS?", gamename+" doesn't exist you cheeky bastard!")
@@ -441,40 +389,12 @@ func GrabKey(s *discordgo.Session, m *discordgo.MessageCreate) {
 //PrintMyGames will print out the list of games a user has taken
 func PrintMyGames(s *discordgo.Session, m *discordgo.MessageCreate) {
 
-	fileLock.RLock()
-	defer fileLock.RUnlock()
-	Load(config.UserFile, &userList)
-
-	if len(userList) == 0 {
-		SendEmbed(s, m.ChannelID, "", "Empty User List", "No users present in list")
-		return
-	}
-
-	list := userList[m.Author.Username]
-	var buffer bytes.Buffer
-
-	sort.Strings(list)
-
-	for i := range list {
-		buffer.WriteString(userList[m.Author.Username][i])
-		buffer.WriteString("\n")
-	}
-
-	SendEmbed(s, m.ChannelID, "", "Game List", buffer.String())
+	//SendEmbed(s, m.ChannelID, "", "Game List", buffer.String())
 	return
 }
 
 //ListKeys lists what games and how many keys for each
 func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
-
-	fileLock.RLock()
-	defer fileLock.RUnlock()
-	Load(config.DbFile, &x)
-
-	if len(x) == 0 {
-		SendEmbed(s, m.ChannelID, "", "EMPTY DATABASE", "No Keys present in Database")
-		return
-	}
 
 	if config.ListPMOnly {
 		if m.ChannelID == config.BroadcastChannel {
@@ -483,43 +403,41 @@ func ListKeys(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	// Lets make this pretty, sort keys by name
-	keys := make([]string, 0, len(x))
-	for key := range x {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	// Build the output message
-	var buffer bytes.Buffer
 	k := 0
-	i := 0
-	for i = range keys {
-		buffer.WriteString(x[keys[i]][0].GameName)
-		buffer.WriteString(" (")
-		buffer.WriteString(getGameServiceString(x[keys[i]][0].Serial))
-		buffer.WriteString(")")
-		buffer.WriteString(" : ")
-		buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
+	var buffer bytes.Buffer
+	list, err := database.Query("SELECT DISTINCT pretty as name, (SELECT COUNT(*) FROM keys WHERE games.id = game_id) gamecount FROM games INNER JOIN keys on keys.game_id = games.id order by pretty")
+	defer list.Close()
+	if err != nil {
+		SendEmbed(s, m.ChannelID, "", "Search Results", "Error getting list of games")
+		return
+	}
+
+	for list.Next() {
+		var pretty string
+		var count int
+		err = list.Scan(&pretty, &count)
+		if err == sql.ErrNoRows {
+			SendEmbed(s, m.ChannelID, "", "Game List", "No Games in Database")
+			return
+		}
+
+		buffer.WriteString(pretty)
+		buffer.WriteString(": ")
+		buffer.WriteString(strconv.Itoa(count))
 		buffer.WriteString(" keys\n")
 		k++
 
 		if k == 20 {
-			SendEmbed(s, m.ChannelID, "Current Key List",
-				"Games: "+strconv.Itoa((i+1)-(k-1))+" to "+strconv.Itoa((i+1)),
-				buffer.String())
+			SendEmbed(s, m.ChannelID, "", "Game List", buffer.String())
 			buffer.Reset()
 			k = 0
 		}
 	}
 
 	if k != 0 {
-		SendEmbed(s, m.ChannelID, "Current Key List",
-			"Games: "+strconv.Itoa((i+1)-(k-1))+" to "+strconv.Itoa(i+1),
-			buffer.String())
+		SendEmbed(s, m.ChannelID, "", "Game List", buffer.String())
 		buffer.Reset()
 	}
-
 }
 
 //AddGame will add a new key to the db
@@ -542,42 +460,61 @@ func AddGame(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	userid := CheckAndUpdateUser(s, m)
 	// Strip the cmd, split off key from regex and grab name
-	m.Content = strings.TrimPrefix(m.Content, "!add ")
-	regtest := re.Split(m.Content, -1)
-	key := regtest[1]
-	gamename := CleanKey(m.Content, key)
-	normalized := NormalizeGame(gamename)
+	//m.Content = strings.TrimPrefix(m.Content, "!add ")
+	//regtest := re.Split(m.Content, -1)
+	//key := regtest[1]
+	//gamename := CleanKey(m.Content, key)
+	//normalized := NormalizeGame(gamename)
 
-	var thiskey GameKey
+	/*var thiskey GameKey
 	thiskey.Author = m.Author.Username
 	thiskey.GameName = gamename
 	thiskey.Serial = key
 	thiskey.ServiceType = getGameServiceString(thiskey.Serial)
-
-	fileLock.Lock()
-	defer fileLock.Unlock()
-
-	Load(config.DbFile, &x)
-
+	*/
 	//Check if key already exists
-	for i := range x[normalized] {
-		if thiskey.Serial == x[normalized][i].Serial {
-			SendEmbed(s, m.ChannelID, "", "Already Exists", "Key already entered in database")
-			return
+
+	//Add new key and notify user and channel, then save to disk
+	/*
+		SendEmbed(s, config.BroadcastChannel, "", "All Praise "+thiskey.Author, "Thanks "+thiskey.Author+
+			" for adding a key for "+thiskey.GameName+" ("+thiskey.ServiceType+"). There are now "+strconv.Itoa(len(x[normalized]))+
+			" keys for "+thiskey.GameName)
+
+		SendEmbed(s, m.ChannelID, "", "All Praise "+thiskey.Author, "Thanks "+thiskey.Author+
+			" for adding a key for "+thiskey.GameName+" ("+thiskey.ServiceType+"). There are now "+strconv.Itoa(len(x[normalized]))+
+			" keys for "+thiskey.GameName)
+	*/
+}
+
+// CheckAndUpdateUser Check current user info against database, update if necessary, and return DB ID
+func CheckAndUpdateUser(s *discordgo.Session, m *discordgo.MessageCreate) int {
+
+	var noMatchName bool
+	var noMatchDiscordid bool
+
+	// Search for users discordid in the DB, this should be the fast case as people are added
+
+	// Search for users name in the DB, here we will need to check/update their discordid
+	// What to do if someone shadows a name?
+	list, err := database.Query("SELECT name, id, discordid FROM users where name = ?", m.Author.Username)
+	defer list.Close()
+	if err != nil {
+		SendEmbed(s, m.ChannelID, "", "Add Game", "Error looking up user "+m.Author.Username+" in database")
+		return
+	}
+
+	for list.Next() {
+		var name string
+		var id int
+		var discordid int
+		err = list.Scan(&name, &id, &discordid)
+
+		if err == sql.ErrNoRows {
+			// User has no matching DB entry to name, jump to add new user
 		}
 	}
 
-	//Add new key and notify user and channel, then save to disk
-	x[normalized] = append(x[normalized], thiskey)
-
-	SendEmbed(s, config.BroadcastChannel, "", "All Praise "+thiskey.Author, "Thanks "+thiskey.Author+
-		" for adding a key for "+thiskey.GameName+" ("+thiskey.ServiceType+"). There are now "+strconv.Itoa(len(x[normalized]))+
-		" keys for "+thiskey.GameName)
-
-	SendEmbed(s, m.ChannelID, "", "All Praise "+thiskey.Author, "Thanks "+thiskey.Author+
-		" for adding a key for "+thiskey.GameName+" ("+thiskey.ServiceType+"). There are now "+strconv.Itoa(len(x[normalized]))+
-		" keys for "+thiskey.GameName)
-
-	Save(config.DbFile, &x)
+	// User has no entry in DB, add a new one
 }

@@ -1,9 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -79,36 +76,6 @@ func NormalizeGame(name string) string {
 	tmp := strings.ToLower(name)
 	tmp = strings.Replace(tmp, " ", "", -1)
 	return tmp
-}
-
-// Save via json to file
-func Save(path string, object interface{}) {
-	b, err := json.Marshal(object)
-	if err != nil {
-		fmt.Println("error on marshall")
-	}
-	fileh, err := os.Create(path)
-	n, err := fileh.Write(b)
-	b = b[:n]
-	fileh.Close()
-	return
-}
-
-// Load json file
-func Load(path string, object interface{}) {
-	fileh, err := os.Open(path)
-	fileinfo, err := fileh.Stat()
-	_ = err
-	b := make([]byte, fileinfo.Size())
-	n, err := fileh.Read(b)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	b = b[:n]
-	json.Unmarshal(b, &object)
-	fileh.Close()
-	return
 }
 
 // This function refreshes the roleID

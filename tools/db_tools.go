@@ -30,9 +30,10 @@ var (
 	printout        bool
 	deleteauth      bool
 	convert         bool
+	test            bool
 	dbFile          string
 	converteddbFile string
-	//database        *sql.DB
+	database        *sql.DB
 )
 
 func init() {
@@ -44,6 +45,7 @@ func init() {
 	flag.StringVar(&converteddbFile, "newdb", "keys-sqlite.db", "Optional name of the new sql formatted database output. -newdb=keys-sqlite.db")
 	flag.BoolVar(&printout, "p", false, "print keys for author (New style DB)")
 	flag.BoolVar(&deleteauth, "d", false, "delete keys from author (New style DB)")
+	flag.BoolVar(&test, "t", false, "run test functions")
 	flag.Parse()
 
 }
@@ -73,8 +75,36 @@ func main() {
 	if convert {
 		convertDB()
 	}
+
+	if test {
+		var err error
+		database, err = sql.Open("sqlite3", converteddbFile)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		tests()
+	}
 }
 
+func tests() {
+
+	defer database.Close()
+	search := "asdfasdfa"
+	//counts, err := database.Query("SELECT COUNT(*) FROM games WHERE normalized like '(?)'", search)
+	list, err := database.Query("SELECT DISTINCT pretty as name, (SELECT COUNT(*) FROM keys WHERE games.id = game_id) gamecount FROM games INNER JOIN keys on keys.game_id = games.id WHERE games.normalized like ? order by pretty", "%"+search+"%")
+
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	for list.Next() {
+		var num int
+		var name string
+		list.Scan(&name, &num)
+		fmt.Println("Got counts of: ", strconv.Itoa(num)+" for string "+search+" game:"+name)
+	}
+}
 func printKeys() {
 	database, err := sql.Open("sqlite3", converteddbFile)
 	if err != nil {
@@ -253,7 +283,29 @@ func insertKeys() {
 	if foundErr {
 		println("\n\nIf this is a unique failure this game key already matches an existing one so you have a bad entry somewhere.\nThis is only a notification, the duplicate game is already in the database and this duplicate will not be entered\n\n")
 	}
+
+	counts, err := database.Query("SELECT COUNT(*) FROM keys")
+	if err != nil {
+		log.Print(err)
+	}
+
 	println("Inserted " + strconv.Itoa(count) + " game keys in to the database")
+	for counts.Next() {
+		var keys int
+		counts.Scan(&keys)
+		println("Count of keys: " + strconv.Itoa(keys))
+	}
+	counts.Close()
+	counts, err = database.Query("SELECT COUNT(*) FROM games")
+	if err != nil {
+		log.Print(err)
+	}
+	for counts.Next() {
+		var keys int
+		counts.Scan(&keys)
+		println("Count of games: " + strconv.Itoa(keys))
+	}
+
 }
 
 func convertDB() {
@@ -279,7 +331,7 @@ func convertDB() {
 		return
 	}
 
-	statement, _ = database.Prepare("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, discordid INTEGER UNIQUE)")
+	statement, _ = database.Prepare("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, discordid INTEGER UNIQUE)")
 	_, err = statement.Exec()
 	if err != nil {
 		log.Fatal(err)
