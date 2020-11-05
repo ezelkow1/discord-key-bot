@@ -169,8 +169,15 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 		s.UpdateStatus(0, "")
 		//SendEmbed(s, config.BroadcastChannel, "", "I iz here", "Keybot has arrived. You may now use me like the dumpster I am")
 		if config.KeyRole != "" {
-			guildID = event.Guilds[0].ID
-			refreshRoles(s)
+			if len(event.Guilds) > 0 {
+				guildID = event.Guilds[0].ID
+				refreshRoles(s)
+			} else {
+				fmt.Println("Error: No servers returned from discord. Make sure to invite your bot to your server first")
+				fmt.Println("Error: You can do that with https://discord.com/oauth2/authorize?client_id=123451234512345&scope=bot")
+				fmt.Println("Error: Replace the number with your bot's clientid value from your developer portal")
+				os.Exit(4)
+			}
 		}
 
 		initialized = true
