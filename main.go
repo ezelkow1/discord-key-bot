@@ -28,14 +28,13 @@ type GameKey struct {
 
 // Configuration for bot
 type Configuration struct {
-	Token            string
-	BroadcastChannel string
-	DbFile           string
-	UserFile         string
-	ListPMOnly       bool
-	OwnerID          string
-	GuildID          string
-	AppID            string
+	Token      string
+	DbFile     string
+	UserFile   string
+	ListPMOnly bool
+	OwnerID    string
+	GuildID    string
+	AppID      string
 }
 
 // Variables used for command line parameters or global
@@ -154,6 +153,7 @@ func main() {
 				h(s, i)
 			}
 		case discordgo.InteractionModalSubmit:
+			var embedslice []*discordgo.MessageEmbed
 			data := i.ModalSubmitData()
 
 			if !strings.HasPrefix(data.CustomID, "add") {
@@ -167,29 +167,24 @@ func main() {
 				panic(err)
 			}
 
-			err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "Thank you for adding a new game",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-			if err != nil {
-				panic(err)
-			}
-
 			numkey := AddGame(data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value,
 				data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value,
 				member.User.Username)
 			if numkey > 0 {
-				s.ChannelMessageSendEmbed(config.BroadcastChannel, NewEmbed().SetTitle("All Praise "+member.User.Username).SetColor(embedColor).SetDescription("Thanks "+member.User.Username+" for adding a key for "+
+				embedslice = append(embedslice, NewEmbed().SetTitle("All Praise "+member.User.Username).SetColor(embedColor).SetDescription("Thanks "+member.User.Username+" for adding a key for "+
 					data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value+". There are now "+strconv.Itoa(numkey)+
 					" keys for "+data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value).MessageEmbed)
 			} else {
-				_, err = s.ChannelMessageSend(config.BroadcastChannel, fmt.Sprintln("Key already exists, try again"))
-				if err != nil {
-					panic(err)
-				}
+				embedslice = append(embedslice, NewEmbed().AddField("Already In Database", "Key already exists in the database").MessageEmbed)
+			}
+			err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Embeds: embedslice,
+				},
+			})
+			if err != nil {
+				panic(err)
 			}
 		}
 
@@ -468,9 +463,10 @@ func take(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			username = i.Member.User.Username
 		}
 		embedslice = nil
-
-		s.ChannelMessageSendEmbed(config.BroadcastChannel, NewEmbed().AddField("Another Satisfied Customer", username+" has just taken a key for "+userkey.GameName+". There are "+strconv.Itoa(len(x[normalized]))+" keys remaining").SetColor(embedColor).MessageEmbed)
-
+		embedslice = append(embedslice, NewEmbed().AddField("Another Satisfied Customer", username+" has just taken a key for "+userkey.GameName+". There are "+strconv.Itoa(len(x[normalized]))+" keys remaining").SetColor(embedColor).MessageEmbed)
+		s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+			Embeds: embedslice,
+		})
 		//If no more keys, remove entry in map
 		if len(x[normalized]) == 0 {
 			delete(x, normalized)
@@ -506,77 +502,6 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 		}
 
 		initialized = true
-	}
-}
-
-// SearchGame will scan the map keys for a match on the substring
-func SearchGame(s *discordgo.Session, m *discordgo.MessageCreate) {
-
-	foundgame := false
-	m.Content = strings.TrimPrefix(m.Content, "!search ")
-
-	fileLock.RLock()
-	defer fileLock.RUnlock()
-
-	Load(config.DbFile, &x)
-	if len(x) == 0 {
-		SendEmbed(s, config.BroadcastChannel, "", "Empty Database", "No Keys present in Database")
-		return
-	}
-
-	search := NormalizeGame(m.Content)
-
-	// Lets make this pretty, sort keys by name
-	keys := make([]string, 0, len(x))
-	for key := range x {
-		if strings.Contains(key, search) {
-			keys = append(keys, key)
-			foundgame = true
-		}
-	}
-
-	if !foundgame {
-		SendEmbed(s, m.ChannelID, "", "Search results", "No Matches Found")
-		return
-	}
-
-	sort.Strings(keys)
-
-	var buffer bytes.Buffer
-
-	k := 0
-	dmchan, err := s.UserChannelCreate(m.Author.ID)
-	if err != nil {
-		fmt.Println("error: ", err)
-		fmt.Println("messageCreate err in creating dmchan")
-		return
-	}
-
-	if len(keys) > 20 && (m.ChannelID != dmchan.ID) {
-		SendEmbed(s, m.ChannelID, "", "Too Many Results", "There are too many search results, please do this search in a DM")
-		return
-	}
-
-	for i := range keys {
-		buffer.WriteString(x[keys[i]][0].GameName)
-		buffer.WriteString(" (")
-		buffer.WriteString(getGameServiceString(x[keys[i]][0].Serial))
-		buffer.WriteString(")")
-		buffer.WriteString(": ")
-		buffer.WriteString(strconv.Itoa(len(x[keys[i]])))
-		buffer.WriteString(" keys\n")
-		k++
-
-		if k == 20 {
-			SendEmbed(s, m.ChannelID, "", "Search Results", buffer.String())
-			buffer.Reset()
-			k = 0
-		}
-	}
-
-	if k != 0 {
-		SendEmbed(s, m.ChannelID, "", "Search Results", buffer.String())
-		buffer.Reset()
 	}
 }
 
