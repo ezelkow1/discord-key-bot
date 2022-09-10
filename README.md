@@ -7,8 +7,11 @@ This requires a conf.json file (or whatever you choose to name the config file).
 
 The commands are:
 /add - This will open a popup dialog to enter a new game and it's key
+
 /search - search the game database for anything that matches
+
 /list - print a list of all games in the database
+
 /take - take a key
 
 The bot will take any added keys, normalize the name by stripping whitespaces and lowercasing, and that becomes the key to a map. Within each key in the map are individual gamekeys which record the original "pretty" version of the game name, the user who donated, the gamekey, and the service for redeeming the key.  Currently, the bot can recognize Steam, Uplay, Origin, PS3, GOG, and URLs. Any other key will be stored as an 'unknown' type.  If a key is Steam or GOG, it will also generate a redemption link on a key `take`.
