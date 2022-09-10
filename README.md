@@ -6,6 +6,7 @@ A bot for discord that accepts, announces, and gives out keys
 This requires a conf.json file (or whatever you choose to name the config file). An editable example is provided. It requires your bot token, the guildID of your server, appID of your bot from discord, and the name of the json/db file for key storage
 
 The commands are:
+
 /add - This will open a popup dialog to enter a new game and it's key
 
 /search - search the game database for anything that matches
