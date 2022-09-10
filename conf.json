@@ -2,6 +2,6 @@
 	"Token": "Enter your bot token here",
 	"BroadcastChannel": "Channel ID number of your broadcast channel (enable dev options in discord, right click on channel and copy ID",
 	"DbFile": "Name of file for database",
-	"KeyRole": "",
-	"ListPMOnly": false
+	"GuildID": "ID value of the discord server you are running the bot on",
+	"AppID": "AppID value from the discord developer portal for your bot"
 }
