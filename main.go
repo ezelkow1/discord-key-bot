@@ -28,13 +28,10 @@ type GameKey struct {
 
 // Configuration for bot
 type Configuration struct {
-	Token      string
-	DbFile     string
-	UserFile   string
-	ListPMOnly bool
-	OwnerID    string
-	GuildID    string
-	AppID      string
+	Token   string
+	DbFile  string
+	GuildID string
+	AppID   string
 }
 
 // Variables used for command line parameters or global
