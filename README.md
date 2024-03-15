@@ -1,5 +1,7 @@
 ![Go](https://github.com/ezelkow1/discord-key-bot/workflows/Go/badge.svg?branch=master)
 
+NOTE: This branch/version is now considered dead. Bots had to be moved to use slash commands and other various updates with things like better permission support in discord itself made many of the features here unnecessary. The main branch is now considered the usable one with slash command support and this deprecated branch being the old master branch is dead
+
 # discord-key-bot
 A bot for discord that accepts, announces, and gives out keys
 
