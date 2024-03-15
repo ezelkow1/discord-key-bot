@@ -21,4 +21,6 @@ Finally, the bot supports searching with /search string, comparing a search subs
 
 If you wish to limit user access this can now be done via discord server controls in the integration section. From there you can limit to channels and user roles for any of the commands or the bot itself.
 
+Note: no releases have been generated for this version that uses slash commands, only prebuilt releases exist of the deprecated version
+
 The latest release can be found here: https://github.com/ezelkow1/discord-key-bot/releases/latest
