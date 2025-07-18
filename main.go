@@ -435,13 +435,17 @@ func take(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if len(x[normalized]) > 0 {
 		var userkey GameKey
 		userkey, x[normalized] = x[normalized][0], x[normalized][1:]
-		embedslice = append(embedslice, NewEmbed().AddField("Here Is your key", userkey.GameName+" ("+userkey.ServiceType+")"+": "+userkey.Serial+"\nThis game was brought to you by "+userkey.Author).SetColor(embedColor).MessageEmbed)
+		keyfield := userkey.GameName + " (" + userkey.ServiceType + ")" + ": " + userkey.Serial + "\nThis game was brought to you by " + userkey.Author
+		linkfield := ""
+		embedslice = append(embedslice, NewEmbed().AddField("Here Is your key", keyfield).SetColor(embedColor).MessageEmbed)
 		if userkey.ServiceType == "Steam" {
-			embedslice = append(embedslice, NewEmbed().AddField("Steam Redeem Link", "https://store.steampowered.com/account/registerkey?key="+userkey.Serial).SetColor(embedColor).MessageEmbed)
+			linkfield = "https://store.steampowered.com/account/registerkey?key=" + userkey.Serial
+			embedslice = append(embedslice, NewEmbed().AddField("Steam Redeem Link", linkfield).SetColor(embedColor).MessageEmbed)
 		}
 
 		if userkey.ServiceType == "GOG" {
-			embedslice = append(embedslice, NewEmbed().AddField("GOG Redeem Link", "https://www.gog.com/redeem/"+userkey.Serial).SetColor(embedColor).MessageEmbed)
+			linkfield = "https://www.gog.com/redeem/" + userkey.Serial
+			embedslice = append(embedslice, NewEmbed().AddField("GOG Redeem Link", linkfield).SetColor(embedColor).MessageEmbed)
 
 		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -467,6 +471,13 @@ func take(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		//If no more keys, remove entry in map
 		if len(x[normalized]) == 0 {
 			delete(x, normalized)
+		}
+		channel, err := s.UserChannelCreate(i.Member.User.ID)
+		if err == nil {
+			SendEmbed(s, channel.ID, "", "Here is your key", keyfield)
+			if linkfield != "" {
+				SendEmbed(s, channel.ID, "", "Redeem Link", linkfield)
+			}
 		}
 
 		Save(config.DbFile, &x)
