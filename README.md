@@ -24,3 +24,5 @@ If you wish to limit user access this can now be done via discord server control
 Note: no releases have been generated for this version that uses slash commands, only prebuilt releases exist of the deprecated version
 
 The latest release can be found here: https://github.com/ezelkow1/discord-key-bot/releases/latest
+
+Also available in dockerized format (tested on an Unraid machine) here: https://hub.docker.com/r/ezelkow1/discord-key-bot
