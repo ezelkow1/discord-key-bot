@@ -1,5 +1,8 @@
 ![Go](https://github.com/ezelkow1/discord-key-bot/workflows/Go/badge.svg?branch=master)
 
+# Archiving
+I am archiving this repo as of 05/04/2026, I can no longer work on this so archiving it in case people still have it forked/edited.
+
 # discord-key-bot
 A bot for discord that accepts, announces, and gives out keys
 
